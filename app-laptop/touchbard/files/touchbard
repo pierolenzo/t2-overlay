@@ -1,0 +1,5 @@
+#!/sbin/openrc-run
+
+command="/usr/bin/touchbard"
+command_background=true
+pidfile="/run/touchbard/touchbard.pid"
