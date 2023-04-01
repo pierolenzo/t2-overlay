@@ -14,6 +14,9 @@ LICENSE="GPL-3"
 SLOT="0"
 KEYWORDS="~amd64"
 IUSE="systemd"
+REQUIRED_USE="${PYTHON_REQUIRED_USE}"
+
+RDEPEND="${PYTHON_DEPS}"
 
 src_install() {
 	python_doscript "${S}/touchbard"
