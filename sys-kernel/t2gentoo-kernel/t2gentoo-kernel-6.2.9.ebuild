@@ -15,7 +15,7 @@ GENTOO_CONFIG_VER=g7
 DESCRIPTION="Linux kernel built with Gentoo patches"
 HOMEPAGE="
 	https://wiki.gentoo.org/wiki/Project:Distribution_Kernel
-	https://www.kernel.org/
+	https://wiki.t2linux.org/
 "
 T2_COMMIT="3a43f2fa1c4afec28f1bffe2aa13e3f4366ecce1"
 SRC_URI+="
@@ -46,7 +46,7 @@ SRC_URI+="
 S=${WORKDIR}/${MY_P}
 
 LICENSE="GPL-2"
-KEYWORDS="~amd64 ~arm ~arm64 ~hppa ~ppc ~ppc64 ~riscv ~x86"
+KEYWORDS="~amd64"
 IUSE="debug hardened"
 REQUIRED_USE="arm? ( savedconfig )
 	hppa? ( savedconfig )
