@@ -11,8 +11,8 @@ inherit kernel-2
 detect_version
 detect_arch
 
-KEYWORDS="~alpha ~amd64 ~arm ~arm64 ~hppa ~ia64 ~loong ~m68k ~mips ~ppc ~ppc64 ~riscv ~s390 ~sparc ~x86"
-HOMEPAGE="https://dev.gentoo.org/~mpagano/genpatches"
+KEYWORDS="~amd64"
+HOMEPAGE="https://wiki.t2linux.org/"
 IUSE="experimental"
 
 DESCRIPTION="Linux kernel sources including patches for T2 MacBooks and genpatches"
