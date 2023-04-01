@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+	<maintainer type="person">
+		<email>vimproved@inventati.org</email>
+		<name>Violet Purcell</name>
+	</maintainer>
+	<use>
+		<flag name="pulseaudio">Install configuration files for Pulseaudio</flag>
+	</use>
+	<upstream>
+		<remote-id type="github">kekrby/t2-better-audio</remote-id>
+	</upstream>
+</pkgmetadata>
