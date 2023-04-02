@@ -16,7 +16,7 @@ SLOT="0"
 KEYWORDS="~amd64"
 
 src_install() {
-	dirs=( "/usr/share/alsa-card-profiles/mixer" )
+	dirs=( "/usr/share/alsa-card-profile/mixer" )
 	use pulseaudio && dirs+=( "/usr/share/pulseaudio/alsa-mixer" )
 	for dir in "${dirs[@]}"; do
 		insinto "${dir}"
