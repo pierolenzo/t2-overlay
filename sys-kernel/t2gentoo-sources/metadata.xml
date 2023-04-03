@@ -2,11 +2,11 @@
 <!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
 <pkgmetadata>
 <maintainer type="person">
-  <email>vimproved@inventati.org</email>
-  <name>Violet Purcell</name>
+	<email>vimproved@inventati.org</email>
+	<name>Violet Purcell</name>
 </maintainer>
 <use>
-  <flag name="experimental">Apply experimental patches; for more information, see "https://wiki.gentoo.org/wiki/Project:Kernel/Experimental".</flag>
+	<flag name="experimental">Apply experimental patches; for more information, see "https://wiki.gentoo.org/wiki/Project:Kernel/Experimental".</flag>
 </use>
 <upstream>
 	<remote-id type="cpe">cpe:/o:linux:linux_kernel</remote-id>
