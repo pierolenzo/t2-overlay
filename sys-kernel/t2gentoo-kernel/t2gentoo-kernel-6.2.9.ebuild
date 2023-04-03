@@ -144,3 +144,12 @@ src_prepare() {
 
 	kernel-build_merge_configs "${merge_configs[@]}"
 }
+
+pkg_postinst() {
+	if use initramfs; then
+		ewarn "If you need keyboard access in the initramfs (such as for LUKS password entry),"
+		ewarn "make sure to add apple-bce to and rebuild the initramfs using the method"
+		ewarn "outlined in the wiki: https://wiki.gentoo.org/wiki/Dracut#Kernel_modules"
+	fi
+	kernel-build_pkg_postinst
+}
