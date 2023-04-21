@@ -1,0 +1,5 @@
+#!/sbin/openrc-run
+
+command="/usr/bin/t2fand"
+command_background=true
+pidfile="/run/t2fand.pid"
