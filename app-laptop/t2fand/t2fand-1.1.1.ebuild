@@ -26,7 +26,7 @@ src_install() {
 }
 
 pkg_postinst() {
-	elog "To enable touchbard:"
+	elog "To enable t2fand:"
 	elog "[openrc] rc-update add t2fand default && rc-service t2fand start"
 	elog "[systemd] systemctl enable --now t2fand"
 }
