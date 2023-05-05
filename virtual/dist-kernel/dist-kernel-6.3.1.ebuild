@@ -13,8 +13,8 @@ SLOT="0/${PV}"
 
 RDEPEND="
 	|| (
+		~sys-kernel/t2gentoo-kernel-${PV}
 		~sys-kernel/gentoo-kernel-${PV}
 		~sys-kernel/gentoo-kernel-bin-${PV}
-		~sys-kernel/t2gentoo-kernel-${PV}
 		~sys-kernel/vanilla-kernel-${PV}
 	)"

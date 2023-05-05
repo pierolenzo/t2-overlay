@@ -13,8 +13,8 @@ KEYWORDS="~amd64 ~arm ~arm64 ~hppa ~ppc ~ppc64 ~riscv ~x86"
 
 RDEPEND="
 	|| (
+		~sys-kernel/t2gentoo-kernel-${PV}
 		~sys-kernel/gentoo-kernel-${PV}
 		~sys-kernel/gentoo-kernel-bin-${PV}
-		~sys-kernel/t2gentoo-kernel-${PV}
 		~sys-kernel/vanilla-kernel-${PV}
 	)"
