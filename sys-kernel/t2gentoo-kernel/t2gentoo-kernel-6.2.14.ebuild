@@ -47,7 +47,7 @@ S=${WORKDIR}/${MY_P}
 
 LICENSE="GPL-2"
 KEYWORDS="~amd64"
-IUSE="debug hardened"
+IUSE="debug experimental hardened"
 REQUIRED_USE="arm? ( savedconfig )
 	hppa? ( savedconfig )
 	riscv? ( savedconfig )"
@@ -73,6 +73,9 @@ src_prepare() {
 		# meh, genpatches have no directory
 		"${WORKDIR}"/*.patch
 		"${WORKDIR}"/"linux-t2-patches-${T2_COMMIT}"/*.patch
+	)
+	use experimental && PATCHES+=(
+		"${FILESDIR}/more-uarches.patch"
 	)
 	default
 
@@ -123,6 +126,9 @@ src_prepare() {
 		"${dist_conf_path}"/base.config
 		"${FILESDIR}"/t2gentoo.config
 		"${WORKDIR}"/"linux-t2-patches-${T2_COMMIT}"/extra_config
+	)
+	use experimental && merge_configs+=(
+		"${FILESDIR}/t2gentoo-experimental.config"
 	)
 	use debug || merge_configs+=(
 		"${dist_conf_path}"/no-debug.config
