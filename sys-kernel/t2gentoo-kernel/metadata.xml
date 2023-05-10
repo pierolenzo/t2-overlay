@@ -6,6 +6,7 @@
 		<name>Violet Purcell</name>
 	</maintainer>
 	<use>
+		<flag name="experimental">Enable experimental patches</flag>
 		<flag name="hardened">Use selection of hardening options recommended by Kernel Self Protection Project</flag>
 		<flag name="initramfs">Build initramfs along with the kernel.</flag>
 	</use>
