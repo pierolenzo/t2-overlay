@@ -17,15 +17,17 @@ HOMEPAGE="
 	https://wiki.gentoo.org/wiki/Project:Distribution_Kernel
 	https://wiki.t2linux.org/
 "
-MY_T2_PV="0235dd75fba03f81295701c1b18e5b7888d2a3e7"
+T2_COMMIT="0235dd75fba03f81295701c1b18e5b7888d2a3e7"
+GRAYSKY_COMMIT="48eccba759279c53f206f7e5d7534b623d25c382"
 SRC_URI+="
 	https://cdn.kernel.org/pub/linux/kernel/v$(ver_cut 1).x/${MY_P}.tar.xz
 	https://dev.gentoo.org/~mpagano/dist/genpatches/${GENPATCHES_P}.base.tar.xz
 	https://dev.gentoo.org/~mpagano/dist/genpatches/${GENPATCHES_P}.extras.tar.xz
+	https://github.com/graysky2/kernel_compiler_patch/raw/${GRAYSKY_COMMIT}/more-uarches-for-kernel-5.17%2B.patch -> more-uarches-${GRAYSKY_COMMIT}.patch
 	https://github.com/projg2/gentoo-kernel-config/archive/${GENTOO_CONFIG_VER}.tar.gz
 		-> gentoo-kernel-config-${GENTOO_CONFIG_VER}.tar.gz
-	https://github.com/t2linux/linux-t2-patches/archive/${MY_T2_PV}.tar.gz
-		-> linux-t2-patches-${MY_T2_PV}.tar.gz
+	https://github.com/t2linux/linux-t2-patches/archive/${T2_COMMIT}.tar.gz
+		-> linux-t2-patches-${T2_COMMIT}.tar.gz
 	amd64? (
 		https://raw.githubusercontent.com/projg2/fedora-kernel-config-for-gentoo/${CONFIG_VER}/kernel-x86_64-fedora.config
 			-> kernel-x86_64-fedora.config.${CONFIG_VER}
@@ -73,10 +75,10 @@ src_prepare() {
 	local PATCHES=(
 		# meh, genpatches have no directory
 		"${WORKDIR}"/*.patch
-		"${WORKDIR}"/"linux-t2-patches-${MY_T2_PV}"/*.patch
+		"${WORKDIR}"/"linux-t2-patches-${T2_COMMIT}"/*.patch
 	)
 	use experimental && PATCHES+=(
-		"${FILESDIR}/more-uarches.patch"
+		"${DISTDIR}/more-uarches-${GRAYSKY_COMMIT}.patch"
 	)
 	default
 
@@ -126,7 +128,7 @@ src_prepare() {
 		"${T}"/version.config
 		"${dist_conf_path}"/base.config
 		"${FILESDIR}"/t2gentoo.config
-		"${WORKDIR}"/"linux-t2-patches-${MY_T2_PV}"/extra_config
+		"${WORKDIR}"/"linux-t2-patches-${T2_COMMIT}"/extra_config
 	)
 	use experimental && merge_configs+=(
 		"${FILESDIR}/t2gentoo-experimental.config"

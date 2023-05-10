@@ -18,10 +18,12 @@ HOMEPAGE="
 	https://wiki.t2linux.org/
 "
 T2_COMMIT="3a43f2fa1c4afec28f1bffe2aa13e3f4366ecce1"
+GRAYSKY_COMMIT="48eccba759279c53f206f7e5d7534b623d25c382"
 SRC_URI+="
 	https://cdn.kernel.org/pub/linux/kernel/v$(ver_cut 1).x/${MY_P}.tar.xz
 	https://dev.gentoo.org/~mpagano/dist/genpatches/${GENPATCHES_P}.base.tar.xz
 	https://dev.gentoo.org/~mpagano/dist/genpatches/${GENPATCHES_P}.extras.tar.xz
+	https://github.com/graysky2/kernel_compiler_patch/raw/${GRAYSKY_COMMIT}/more-uarches-for-kernel-5.17%2B.patch -> more-uarches-${GRAYSKY_COMMIT}.patch
 	https://github.com/projg2/gentoo-kernel-config/archive/${GENTOO_CONFIG_VER}.tar.gz
 		-> gentoo-kernel-config-${GENTOO_CONFIG_VER}.tar.gz
 	https://github.com/t2linux/linux-t2-patches/archive/${T2_COMMIT}.tar.gz
@@ -75,7 +77,7 @@ src_prepare() {
 		"${WORKDIR}"/"linux-t2-patches-${T2_COMMIT}"/*.patch
 	)
 	use experimental && PATCHES+=(
-		"${FILESDIR}/more-uarches.patch"
+		"${DISTDIR}/more-uarches-${GRAYSKY_COMMIT}.patch"
 	)
 	default
 
