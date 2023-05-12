@@ -14,18 +14,18 @@ KEYWORDS="~alpha ~amd64 ~arm ~arm64 ~hppa ~ia64 ~loong ~m68k ~mips ~ppc ~ppc64 ~
 HOMEPAGE="https://dev.gentoo.org/~mpagano/genpatches"
 IUSE="experimental"
 
-MY_T2_COMMIT="0235dd75fba03f81295701c1b18e5b7888d2a3e7"
+T2_COMMIT="d0e70c9396db0c97b47155a649838bb7ba82a690"
 DESCRIPTION="Full sources including the Gentoo patchset for the ${KV_MAJOR}.${KV_MINOR} kernel tree"
 SRC_URI="${KERNEL_URI} ${GENPATCHES_URI} ${ARCH_URI}
-	https://github.com/t2linux/linux-t2-patches/archive/${MY_T2_COMMIT}.tar.gz -> linux-t2-patches-${MY_T2_COMMIT}.tar.gz"
+	https://github.com/t2linux/linux-t2-patches/archive/${T2_COMMIT}.tar.gz -> linux-t2-patches-${T2_COMMIT}.tar.gz"
 
 src_unpack() {
-	unpack "linux-t2-patches-${MY_T2_COMMIT}.tar.gz"
+	unpack "linux-t2-patches-${T2_COMMIT}.tar.gz"
 	kernel-2_src_unpack
 }
 
 src_prepare() {
-	eapply "${WORKDIR}/linux-t2-patches-${MY_T2_COMMIT}"/*.patch
+	eapply "${WORKDIR}/linux-t2-patches-${T2_COMMIT}"/*.patch
 	kernel-2_src_prepare
 }
 
