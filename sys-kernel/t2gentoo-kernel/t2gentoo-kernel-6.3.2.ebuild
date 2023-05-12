@@ -17,7 +17,7 @@ HOMEPAGE="
 	https://wiki.gentoo.org/wiki/Project:Distribution_Kernel
 	https://wiki.t2linux.org/
 "
-T2_COMMIT="0235dd75fba03f81295701c1b18e5b7888d2a3e7"
+T2_COMMIT="d0e70c9396db0c97b47155a649838bb7ba82a690"
 GRAYSKY_COMMIT="48eccba759279c53f206f7e5d7534b623d25c382"
 SRC_URI+="
 	https://cdn.kernel.org/pub/linux/kernel/v$(ver_cut 1).x/${MY_P}.tar.xz
