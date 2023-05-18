@@ -10,5 +10,6 @@
 </use>
 <upstream>
   <remote-id type="cpe">cpe:/o:linux:linux_kernel</remote-id>
+  <remote-id type="github">t2linux/linux-t2-patches</remote-id>
 </upstream>
 </pkgmetadata>
