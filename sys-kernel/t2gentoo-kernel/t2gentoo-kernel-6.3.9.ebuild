@@ -3,13 +3,14 @@
 
 EAPI=8
 
+KERNEL_IUSE_MODULES_SIGN=1
 inherit kernel-build toolchain-funcs
 
 MY_P=linux-${PV%.*}
 GENPATCHES_P=genpatches-${PV%.*}-$(( ${PV##*.} + 3 ))
 # https://koji.fedoraproject.org/koji/packageinfo?packageID=8
 # forked to https://github.com/projg2/fedora-kernel-config-for-gentoo
-CONFIG_VER=6.3.1-gentoo
+CONFIG_VER=6.3.7-gentoo
 GENTOO_CONFIG_VER=g7
 
 DESCRIPTION="Linux kernel built with Gentoo patches"
@@ -21,8 +22,8 @@ T2_COMMIT="13dee3659d1ef17c5ea588c8be629fe693045496"
 GRAYSKY_COMMIT="48eccba759279c53f206f7e5d7534b623d25c382"
 SRC_URI+="
 	https://cdn.kernel.org/pub/linux/kernel/v$(ver_cut 1).x/${MY_P}.tar.xz
-	https://dev.gentoo.org/~mpagano/dist/genpatches/${GENPATCHES_P}.base.tar.xz
-	https://dev.gentoo.org/~mpagano/dist/genpatches/${GENPATCHES_P}.extras.tar.xz
+	https://dev.gentoo.org/~alicef/dist/genpatches/${GENPATCHES_P}.base.tar.xz
+	https://dev.gentoo.org/~alicef/dist/genpatches/${GENPATCHES_P}.extras.tar.xz
 	experimental? (
 		https://github.com/graysky2/kernel_compiler_patch/raw/${GRAYSKY_COMMIT}/more-uarches-for-kernel-5.17%2B.patch
 			-> more-uarches-${GRAYSKY_COMMIT}.patch
