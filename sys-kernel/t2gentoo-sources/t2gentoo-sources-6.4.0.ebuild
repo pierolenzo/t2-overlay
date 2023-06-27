@@ -4,7 +4,8 @@
 EAPI="8"
 ETYPE="sources"
 K_WANT_GENPATCHES="base extras experimental"
-K_GENPATCHES_VER="11"
+K_GENPATCHES_VER="1"
+K_SECURITY_UNSUPPORTED="1"
 
 inherit kernel-2
 detect_version
@@ -14,7 +15,7 @@ KEYWORDS="~alpha ~amd64 ~arm ~arm64 ~hppa ~ia64 ~loong ~m68k ~mips ~ppc ~ppc64 ~
 HOMEPAGE="https://dev.gentoo.org/~mpagano/genpatches"
 IUSE="experimental"
 
-T2_COMMIT="13dee3659d1ef17c5ea588c8be629fe693045496"
+T2_COMMIT="c0db79a25bc37dbd0c27636914b3903016a2fc39"
 DESCRIPTION="Full sources including the Gentoo patchset for the ${KV_MAJOR}.${KV_MINOR} kernel tree"
 SRC_URI="${KERNEL_URI} ${GENPATCHES_URI} ${ARCH_URI}
 	https://github.com/t2linux/linux-t2-patches/archive/${T2_COMMIT}.tar.gz -> linux-t2-patches-${T2_COMMIT}.tar.gz"
