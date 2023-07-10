@@ -27,6 +27,7 @@ src_unpack() {
 
 src_prepare() {
 	eapply "${WORKDIR}/linux-t2-patches-${T2_COMMIT}"/*.patch
+	rm -rf "${WORKDIR}/linux-t2-patches-${T2_COMMIT}" || die
 	kernel-2_src_prepare
 }
 
