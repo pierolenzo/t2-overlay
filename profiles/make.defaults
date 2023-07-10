@@ -1,0 +1,9 @@
+# Violet Purcell <vimproved@inventati.org> (2023-07-10)
+# Add BRCMFMAC_CARDS to USE_EXPAND
+USE_EXPAND="BRCMFMAC_CARDS"
+
+# Default for BRCMFMAC_CARDS
+BRCMFMAC_CARDS="
+	hawaii ekans hanauma kahana kauai lanai maui midway nihau sid bali borneo hanauma kahana kure sid trinidad fiji
+	formosa tahiti atlantisb capri honshu santorini shikoku kyushu hokkaido madagascar maldives okinawa
+"
