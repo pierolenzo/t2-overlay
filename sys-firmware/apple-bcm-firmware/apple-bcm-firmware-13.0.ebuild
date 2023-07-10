@@ -11,7 +11,13 @@ SRC_URI="https://mirror.funami.tech/arch-mact2/os/x86_64/${P}-1-any.pkg.tar.zst"
 LICENSE="all-rights-reserved"
 SLOT="0"
 KEYWORDS="~amd64"
-IUSE="savedconfig"
+BRCMFMAC_CARDS_IUSE="
+	hawaii ekans hanauma kahana kauai lanai maui midway nihau sid bali borneo hanauma kahana kure sid trinidad fiji
+	formosa tahiti atlantisb capri honshu santorini shikoku kyushu hokkaido madagascar maldives okinawa
+"
+for card in ${BRCMFMAC_CARDS_IUSE}; do
+	IUSE+=" brcmfmac_cards_${card}"
+done
 
 BDEPEND="
 	app-arch/zstd
@@ -24,6 +30,8 @@ src_unpack() {
 }
 
 src_install() {
-	insinto /lib/firmware/
-	doins -r "${WORKDIR}/usr/lib/firmware/brcm/"
+	insinto /lib/firmware/brcm/
+	for card in ${BRCMFMAC_CARDS}; do
+		doins "${WORKDIR}/usr/lib/firmware/brcm/brcmfmac43"*"-pcie.apple,${card}"*
+	done
 }
