@@ -7,31 +7,26 @@ KERNEL_IUSE_MODULES_SIGN=1
 inherit kernel-build toolchain-funcs
 
 MY_P=linux-${PV%.*}
-GENPATCHES_P=genpatches-${PV%.*}-$(( ${PV##*.} + 4 ))
+GENPATCHES_P=genpatches-${PV%.*}-$(( ${PV##*.} + 2 ))
 # https://koji.fedoraproject.org/koji/packageinfo?packageID=8
 # forked to https://github.com/projg2/fedora-kernel-config-for-gentoo
-CONFIG_VER=6.3.7-gentoo
+CONFIG_VER=6.4.3-gentoo
 GENTOO_CONFIG_VER=g7
+LINUX_T2_PATCHES_VER="c0db79a25bc37dbd0c27636914b3903016a2fc39"
 
 DESCRIPTION="Linux kernel built with Gentoo patches"
 HOMEPAGE="
 	https://wiki.gentoo.org/wiki/Project:Distribution_Kernel
-	https://wiki.t2linux.org/
+	https://www.kernel.org/
 "
-T2_COMMIT="13dee3659d1ef17c5ea588c8be629fe693045496"
-GRAYSKY_COMMIT="48eccba759279c53f206f7e5d7534b623d25c382"
 SRC_URI+="
 	https://cdn.kernel.org/pub/linux/kernel/v$(ver_cut 1).x/${MY_P}.tar.xz
 	https://dev.gentoo.org/~mpagano/dist/genpatches/${GENPATCHES_P}.base.tar.xz
 	https://dev.gentoo.org/~mpagano/dist/genpatches/${GENPATCHES_P}.extras.tar.xz
-	experimental? (
-		https://github.com/graysky2/kernel_compiler_patch/raw/${GRAYSKY_COMMIT}/more-uarches-for-kernel-5.17%2B.patch
-			-> more-uarches-${GRAYSKY_COMMIT}.patch
-	)
 	https://github.com/projg2/gentoo-kernel-config/archive/${GENTOO_CONFIG_VER}.tar.gz
 		-> gentoo-kernel-config-${GENTOO_CONFIG_VER}.tar.gz
-	https://github.com/t2linux/linux-t2-patches/archive/${T2_COMMIT}.tar.gz
-		-> linux-t2-patches-${T2_COMMIT}.tar.gz
+	https://github.com/t2linux/linux-t2-patches/archive/${LINUX_T2_PATCHES_VER}.tar.gz
+		-> linux-t2-patches-${LINUX_T2_PATCHES_VER}.tar.gz
 	amd64? (
 		https://raw.githubusercontent.com/projg2/fedora-kernel-config-for-gentoo/${CONFIG_VER}/kernel-x86_64-fedora.config
 			-> kernel-x86_64-fedora.config.${CONFIG_VER}
@@ -52,9 +47,8 @@ SRC_URI+="
 S=${WORKDIR}/${MY_P}
 
 LICENSE="GPL-2"
-KEYWORDS="~amd64"
-
-IUSE="debug experimental hardened"
+KEYWORDS="~amd64 ~arm ~arm64 ~hppa ~ppc ~ppc64 ~riscv ~x86"
+IUSE="debug hardened"
 REQUIRED_USE="arm? ( savedconfig )
 	hppa? ( savedconfig )
 	riscv? ( savedconfig )"
@@ -79,10 +73,7 @@ src_prepare() {
 	local PATCHES=(
 		# meh, genpatches have no directory
 		"${WORKDIR}"/*.patch
-		"${WORKDIR}"/"linux-t2-patches-${T2_COMMIT}"/*.patch
-	)
-	use experimental && PATCHES+=(
-		"${DISTDIR}/more-uarches-${GRAYSKY_COMMIT}.patch"
+		"${WORKDIR}/linux-t2-patches-${LINUX_T2_PATCHES_VER}"/*.patch
 	)
 	default
 
@@ -123,7 +114,7 @@ src_prepare() {
 			;;
 	esac
 
-	local myversion="-gentoo-dist"
+	local myversion="-t2gentoo-dist"
 	use hardened && myversion+="-hardened"
 	echo "CONFIG_LOCALVERSION=\"${myversion}\"" > "${T}"/version.config || die
 	local dist_conf_path="${WORKDIR}/gentoo-kernel-config-${GENTOO_CONFIG_VER}"
@@ -131,11 +122,7 @@ src_prepare() {
 	local merge_configs=(
 		"${T}"/version.config
 		"${dist_conf_path}"/base.config
-		"${FILESDIR}"/t2gentoo.config
-		"${WORKDIR}"/"linux-t2-patches-${T2_COMMIT}"/extra_config
-	)
-	use experimental && merge_configs+=(
-		"${FILESDIR}/t2gentoo-experimental.config"
+		"${WORKDIR}/linux-t2-patches-${LINUX_T2_PATCHES_VER}/extra_config"
 	)
 	use debug || merge_configs+=(
 		"${dist_conf_path}"/no-debug.config
@@ -156,13 +143,4 @@ src_prepare() {
 	fi
 
 	kernel-build_merge_configs "${merge_configs[@]}"
-}
-
-pkg_postinst() {
-	if use initramfs; then
-		ewarn "If you need keyboard access in the initramfs (such as for LUKS password entry),"
-		ewarn "make sure to add apple-bce to and rebuild the initramfs using the method"
-		ewarn "outlined in the wiki: https://wiki.gentoo.org/wiki/Dracut#Kernel_modules"
-	fi
-	kernel-build_pkg_postinst
 }
