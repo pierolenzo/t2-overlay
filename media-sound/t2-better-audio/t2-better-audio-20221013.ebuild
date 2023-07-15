@@ -9,7 +9,7 @@ HOMEPAGE="https://wiki.t2linux.org/guides/audio-config/"
 T2_BETTER_AUDIO_COMMIT="e46839a28963e2f7d364020518b9dac98236bcae"
 SRC_URI="https://github.com/kekrby/t2-better-audio/archive/${T2_BETTER_AUDIO_COMMIT}.tar.gz -> ${P}.tar.gz"
 S="${WORKDIR}/${PN}-${T2_BETTER_AUDIO_COMMIT}"
-IUSE="pulseaudio udev"
+IUSE="pulseaudio"
 
 LICENSE="MIT"
 SLOT="0"
@@ -24,7 +24,7 @@ src_install() {
 		doins -r "${S}"/files/profile-sets
 	done
 
-	use udev && udev_dorules "${S}"/files/91-audio-custom.rules
+	udev_dorules "${S}"/files/91-audio-custom.rules
 }
 
 pkg_postinst() {
