@@ -4,7 +4,7 @@
 EAPI=8
 
 PYTHON_COMPAT=( python3_{10..12} )
-inherit python-single-r1 systemd
+inherit python-single-r1 s6 systemd
 
 DESCRIPTION="Daemon for controlling Touch Bar on your Mac with T2 security chip"
 HOMEPAGE="https://github.com/NoaHimesaka1873/touchbard"
@@ -27,6 +27,7 @@ src_install() {
 
 	use systemd && systemd_dounit "${S}/touchbard.service"
 	doinitd "${FILESDIR}/touchbard"
+	s6_install_service "${FILESDIR}/touchbard.s6"
 }
 
 pkg_postinst() {
