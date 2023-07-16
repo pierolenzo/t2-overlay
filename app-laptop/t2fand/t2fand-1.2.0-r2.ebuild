@@ -4,7 +4,7 @@
 EAPI=8
 
 PYTHON_COMPAT=( python3_{10..12} )
-inherit python-single-r1 systemd
+inherit python-single-r1 s6 systemd
 
 DESCRIPTION="A simple daemon to control fan speed on Macs with T2 chip"
 HOMEPAGE="https://github.com/NoaHimesaka1873/t2fand"
@@ -23,6 +23,7 @@ src_install() {
 
 	use systemd && systemd_dounit "${S}/t2fand.service"
 	doinitd "${FILESDIR}/t2fand"
+	s6_install_service t2fand "${FILESDIR}/t2fand.s6"
 }
 
 pkg_postinst() {
