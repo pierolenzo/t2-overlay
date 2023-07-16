@@ -27,7 +27,7 @@ src_install() {
 
 	use systemd && systemd_dounit "${S}/touchbard.service"
 	doinitd "${FILESDIR}/touchbard"
-	s6_install_service "${FILESDIR}/touchbard.s6"
+	s6_install_service touchbard "${FILESDIR}/touchbard.s6"
 }
 
 pkg_postinst() {
