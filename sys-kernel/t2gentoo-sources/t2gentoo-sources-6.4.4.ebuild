@@ -4,7 +4,7 @@
 EAPI="8"
 ETYPE="sources"
 K_WANT_GENPATCHES="base extras experimental"
-K_GENPATCHES_VER="5"
+K_GENPATCHES_VER="6"
 LINUX_T2_PATCHES_VER="c0db79a25bc37dbd0c27636914b3903016a2fc39"
 
 inherit kernel-2
