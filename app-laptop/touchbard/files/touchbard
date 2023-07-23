@@ -1,10 +1,10 @@
 #!/sbin/openrc-run
 
 command="/usr/bin/touchbard"
-pidfile="/run/touchbard.pid"
+pidfile="/run/touchbard/touchbard.pid"
 
 start() {
-	ebegin "Starting t2fand"
+	ebegin "Starting touchbard"
 
 	start-stop-daemon --start --exec ${command} \
 		--pidfile ${pidfile} --background --
