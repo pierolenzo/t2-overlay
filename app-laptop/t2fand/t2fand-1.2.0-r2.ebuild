@@ -3,7 +3,7 @@
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{10..12} )
+PYTHON_COMPAT=( python3_{10..12} pypy3 )
 inherit python-single-r1 s6 systemd
 
 DESCRIPTION="A simple daemon to control fan speed on Macs with T2 chip"
