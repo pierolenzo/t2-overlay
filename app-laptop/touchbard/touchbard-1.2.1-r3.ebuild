@@ -3,7 +3,7 @@
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{10..12} )
+PYTHON_COMPAT=( python3_{10..12} pypy3 )
 inherit python-single-r1 s6 systemd
 
 DESCRIPTION="Daemon for controlling Touch Bar on your Mac with T2 security chip"
