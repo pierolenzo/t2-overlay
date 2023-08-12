@@ -53,7 +53,7 @@ install:
 }
 
 src_compile() {
-	local modlist=( bcm5974 )
+	local modlist=( bcm5974=updates )
 
 	linux-mod-r1_src_compile
 }
