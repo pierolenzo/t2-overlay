@@ -53,7 +53,7 @@ install:
 }
 
 src_compile() {
-	local modlist=( applesmc )
+	local modlist=( applesmc=updates )
 
 	linux-mod-r1_src_compile
 }
