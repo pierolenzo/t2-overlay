@@ -2,18 +2,17 @@
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
-ADITYAGARG8_APPLE_TOUCHBAR_DRV_COMMIT="ff9ca3da6ad6b7b820c3685c515ad4a61c6455b8"
 inherit linux-mod-r1
 
 DESCRIPTION="Apple iBridge devices support (Touchbar/ALS) for MacBook Pro 2018 and onward."
 HOMEPAGE="https://t2linux.org"
-SRC_URI="https://github.com/AdityaGarg8/apple-touchbar-drv/archive/${ADITYAGARG8_APPLE_TOUCHBAR_DRV_COMMIT}.tar.gz -> ${P}.tar.gz"
+SRC_URI="https://codeberg.org/vimproved/apple-touchbar/archive/${PV}.tar.gz -> ${P}.tar.gz"
 
 LICENSE="GPL-2"
 SLOT="0"
 KEYWORDS="~amd64"
 
-S="${WORKDIR}/${PN}-drv-${ADITYAGARG8_APPLE_TOUCHBAR_DRV_COMMIT}"
+S="${WORKDIR}/${PN}"
 
 RDEPEND="
 	!sys-kernel/t2gentoo-kernel
