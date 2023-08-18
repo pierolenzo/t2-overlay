@@ -12,7 +12,7 @@ GENPATCHES_P=genpatches-${PV%.*}-$(( ${PV##*.} + 2 ))
 # forked to https://github.com/projg2/fedora-kernel-config-for-gentoo
 CONFIG_VER=6.4.3-gentoo
 GENTOO_CONFIG_VER=g7
-LINUX_T2_PATCHES_VER="c908e506346681139a844d41c40b295cfad17ea8"
+LINUX_T2_PATCHES_VER="46dd873d1d9d12b26916790045008a91a95d0c11"
 
 DESCRIPTION="Linux kernel built with Gentoo patches"
 HOMEPAGE="
