@@ -22,5 +22,6 @@ RDEPEND="
 src_compile() {
 	local modlist=( applesmc=updates )
 
+	export KERNELRELEASE=${KV_FULL}
 	linux-mod-r1_src_compile
 }
