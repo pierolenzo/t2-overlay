@@ -2,7 +2,7 @@
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
-inherit linux-mod-r1
+inherit dist-kernel-utils linux-mod-r1
 
 DESCRIPTION="Apple BCE (Buffer Copy Engine) and associated subsystems drivers for T2 Macs"
 HOMEPAGE="https://t2linux.org"
@@ -30,4 +30,12 @@ src_install() {
 	linux-mod-r1_src_install
 	insinto "/etc/dracut.conf.d"
 	doins "${FILESDIR}/apple-bce.conf"
+}
+
+pkg_postinst() {
+	linux-mod-r1_pkg_postinst
+
+	if [[ -z ${ROOT} ]] && use dist-kernel; then
+		dist-kernel_reinstall_initramfs "${KV_DIR}" "${KV_FULL}"
+	fi
 }
