@@ -22,6 +22,7 @@ RDEPEND="
 src_compile() {
 	local modlist=( apple-bce )
 
+	export KERNELRELEASE=${KV_FULL}
 	linux-mod-r1_src_compile
 }
 
