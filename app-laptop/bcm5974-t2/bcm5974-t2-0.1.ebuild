@@ -22,5 +22,6 @@ RDEPEND="
 src_compile() {
 	local modlist=( bcm5974=updates )
 
+	export KERNELRELEASE=${KV_FULL}
 	linux-mod-r1_src_compile
 }
