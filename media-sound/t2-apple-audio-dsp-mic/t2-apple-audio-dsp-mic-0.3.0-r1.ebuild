@@ -14,6 +14,7 @@ KEYWORDS="~amd64"
 S="${WORKDIR}/${PN}-v${PV}"
 
 RDEPEND="
+	media-plugins/swh-plugins
 	media-video/pipewire[sound-server]
 	media-video/wireplumber
 "
