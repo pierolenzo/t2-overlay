@@ -28,8 +28,9 @@ src_unpack() {
 }
 
 src_prepare() {
-	 kernel-2_src_prepare
-	 eapply "${WORKDIR}/linux-t2-patches-${LINUX_T2_PATCHES_VER}"/*.patch
+	kernel-2_src_prepare
+	eapply "${WORKDIR}/linux-t2-patches-${LINUX_T2_PATCHES_VER}"/*.patch
+	rm -rf "${WORKDIR}/linux-t2-patches-${LINUX_T2_PATCHES_VER}" || die
 }
 
 pkg_postinst() {
