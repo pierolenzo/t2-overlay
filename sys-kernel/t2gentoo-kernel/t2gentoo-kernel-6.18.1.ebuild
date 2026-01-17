@@ -6,8 +6,7 @@ EAPI=8
 KERNEL_IUSE_MODULES_SIGN=1
 inherit kernel-build toolchain-funcs
 
-MY_P=linux-${PV%.*}
-GENPATCHES_P=genpatches-${PV%.*}-$(( ${PV##*.} + 2 ))
+BASE_P=linux-${PV%.*}
 # https://koji.fedoraproject.org/koji/packageinfo?packageID=8
 # forked to https://github.com/projg2/fedora-kernel-config-for-gentoo
 CONFIG_VER=6.18.1-gentoo
@@ -20,9 +19,9 @@ HOMEPAGE="
 	https://www.kernel.org/
 "
 SRC_URI+="
-	https://cdn.kernel.org/pub/linux/kernel/v$(ver_cut 1).x/${MY_P}.tar.xz
-	https://dev.gentoo.org/~mpagano/dist/genpatches/${GENPATCHES_P}.base.tar.xz
-	https://dev.gentoo.org/~mpagano/dist/genpatches/${GENPATCHES_P}.extras.tar.xz
+	https://cdn.kernel.org/pub/linux/kernel/v$(ver_cut 1).x/${BASE_P}.tar.xz
+	https://cdn.kernel.org/pub/linux/kernel/v$(ver_cut 1).x/patch-${PV}.xz
+	https://dev.gentoo.org/~mgorny/dist/linux/linux-gentoo-patches-${PV}.tar.xz
 	https://github.com/projg2/gentoo-kernel-config/archive/${GENTOO_CONFIG_VER}.tar.gz
 		-> gentoo-kernel-config-${GENTOO_CONFIG_VER}.tar.gz
 	https://github.com/t2linux/linux-t2-patches/archive/${LINUX_T2_PATCHES_VER}.tar.gz
@@ -44,7 +43,7 @@ SRC_URI+="
 			-> kernel-i686-fedora.config.${CONFIG_VER}
 	)
 "
-S=${WORKDIR}/${MY_P}
+S=${WORKDIR}/${BASE_P}
 
 LICENSE="GPL-2"
 KEYWORDS="~amd64"
@@ -71,8 +70,8 @@ QA_FLAGS_IGNORED="
 
 src_prepare() {
 	local PATCHES=(
-		# meh, genpatches have no directory
-		"${WORKDIR}"/*.patch
+		"${WORKDIR}/patch-${PV}"
+		"${WORKDIR}/linux-gentoo-patches-${PV}"/*.patch
 		"${WORKDIR}/linux-t2-patches-${LINUX_T2_PATCHES_VER}"/*.patch
 	)
 	default
@@ -97,7 +96,7 @@ src_prepare() {
 		ppc)
 			# assume powermac/powerbook defconfig
 			# we still package.use.force savedconfig
-			cp "${WORKDIR}/${MY_P}/arch/powerpc/configs/pmac32_defconfig" .config || die
+			cp "${WORKDIR}/${BASE_P}/arch/powerpc/configs/pmac32_defconfig" .config || die
 			;;
 		ppc64)
 			cp "${DISTDIR}/kernel-ppc64le-fedora.config.${CONFIG_VER}" .config || die
