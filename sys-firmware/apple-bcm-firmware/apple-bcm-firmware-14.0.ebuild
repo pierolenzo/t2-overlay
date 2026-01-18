@@ -15,9 +15,9 @@ BRCMFMAC_CARDS_IUSE="
 	hawaii ekans hanauma kahana kauai lanai maui midway nihau sid bali borneo hanauma kahana kure sid trinidad fiji
 	formosa tahiti atlantisb capri honshu santorini shikoku kyushu hokkaido madagascar maldives okinawa
 "
-for card in ${BRCMFMAC_CARDS_IUSE}; do
-	IUSE+=" brcmfmac_cards_${card}"
-done
+
+cards=( ${BRCMFMAC_CARDS_IUSE} )
+IUSE+=" ${cards[@]/#/brcmfmac_cards_}"
 
 BDEPEND="
 	app-arch/zstd
