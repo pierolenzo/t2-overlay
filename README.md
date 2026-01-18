@@ -7,5 +7,5 @@ To add this repository to portage:
 
 ```
 emerge -av app-eselect/eselect-repository dev-vcs/git
-eselect repository add t2 git https://codeberg.org/vimproved/t2-overlay.git
+eselect repository add t2 git https://github.com/pierolenzo/t2-overlay.git
 ```
