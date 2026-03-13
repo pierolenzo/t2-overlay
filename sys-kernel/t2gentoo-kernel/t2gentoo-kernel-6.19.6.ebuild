@@ -14,7 +14,7 @@ PATCHSET=linux-gentoo-patches-6.19.6
 # forked to https://github.com/projg2/fedora-kernel-config-for-gentoo
 CONFIG_VER=6.19.2-gentoo
 GENTOO_CONFIG_VER=g18
-LINUX_T2_PATCHES_VER="5051ebba61fe8765ba452f46db9b944f33f07a86"
+LINUX_T2_PATCHES_VER="9f8f8e525712a6bd52329c88f6899785087c2440"
 SHA256SUM_DATE=20260304
 
 DESCRIPTION="Linux kernel built with Gentoo patches and t2linux patches"
