@@ -30,7 +30,9 @@ src_unpack() {
 
 src_install() {
 	insinto /lib/firmware/brcm/
+	local card files=()
 	for card in ${BRCMFMAC_CARDS}; do
-		doins "${WORKDIR}/usr/lib/firmware/brcm/brcmfmac43"*"-pcie.apple,${card}"*
+		files+=( "${WORKDIR}/usr/lib/firmware/brcm/brcmfmac43"*"-pcie.apple,${card}"* )
 	done
+	[[ ${#files[@]} -gt 0 ]] && doins "${files[@]}"
 }
