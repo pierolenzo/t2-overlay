@@ -16,12 +16,13 @@ SLOT="0"
 KEYWORDS="~amd64"
 
 src_install() {
-	dirs=( "/usr/share/alsa-card-profile/mixer" )
+	local dirs=( "/usr/share/alsa-card-profile/mixer" )
 	use pulseaudio && dirs+=( "/usr/share/pulseaudio/alsa-mixer" )
+
+	local dir
 	for dir in "${dirs[@]}"; do
 		insinto "${dir}"
-		doins -r "${S}"/files/paths
-		doins -r "${S}"/files/profile-sets
+		doins -r "${S}"/files/{paths,profile-sets}
 	done
 
 	udev_dorules "${S}"/files/91-audio-custom.rules
