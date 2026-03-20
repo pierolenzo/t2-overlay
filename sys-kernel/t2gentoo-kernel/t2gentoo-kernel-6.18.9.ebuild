@@ -80,10 +80,9 @@ src_unpack() {
 
 src_prepare() {
 
-	local patch
-	eapply "${WORKDIR}/patch-${PATCH_PV}"
-	eapply "${WORKDIR}/${PATCHSET}"
-	eapply "${WORKDIR}/linux-t2-patches-${LINUX_T2_PATCHES_VER}"
+	eapply "${WORKDIR}/patch-${PATCH_PV}" \
+		"${WORKDIR}/${PATCHSET}" \
+		"${WORKDIR}/linux-t2-patches-${LINUX_T2_PATCHES_VER}"
 
 	default
 
