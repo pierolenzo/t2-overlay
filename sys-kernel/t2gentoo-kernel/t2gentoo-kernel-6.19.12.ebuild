@@ -9,15 +9,13 @@ inherit kernel-build toolchain-funcs verify-sig
 
 BASE_P=linux-${PV%.*}
 PATCH_PV=${PV%_p*}
-PATCHSET=linux-gentoo-patches-6.18.4
-
+PATCHSET=linux-gentoo-patches-6.19.6
 # https://koji.fedoraproject.org/koji/packageinfo?packageID=8
 # forked to https://github.com/projg2/fedora-kernel-config-for-gentoo
-
-CONFIG_VER=6.18.3-gentoo
+CONFIG_VER=6.19.11-gentoo
 GENTOO_CONFIG_VER=g18
-LINUX_T2_PATCHES_VER="547fa06ff16ae131f2ae1083b17946384ddeb755"
-SHA256SUM_DATE=20260211
+LINUX_T2_PATCHES_VER="76589a89790c33c137d173f2d98b6096cd16b132"
+SHA256SUM_DATE=20260411
 
 DESCRIPTION="Linux kernel built with Gentoo patches and t2linux patches"
 HOMEPAGE="
@@ -91,20 +89,19 @@ src_prepare() {
 	local extraversion=${PV#${PATCH_PV}}
 	sed -i -e "s:^\(EXTRAVERSION =\).*:\1 ${extraversion/_/-}:" Makefile || die
 
-
 	# prepare the default config
 	case ${ARCH} in
-		amd64)
-			cp "${DISTDIR}/kernel-x86_64-fedora.config.${CONFIG_VER}" .config || die
-			;;
-		*)
-			die "Unsupported arch ${ARCH}"
-			;;
+	amd64)
+		cp "${DISTDIR}/kernel-x86_64-fedora.config.${CONFIG_VER}" .config || die
+		;;
+	*)
+		die "Unsupported arch ${ARCH}"
+		;;
 	esac
 
 	local myversion="-t2gentoo-dist"
 	use hardened && myversion+="-hardened"
-	echo "CONFIG_LOCALVERSION=\"${myversion}\"" > "${T}"/version.config || die
+	echo "CONFIG_LOCALVERSION=\"${myversion}\"" >"${T}"/version.config || die
 	local dist_conf_path="${WORKDIR}/gentoo-kernel-config-${GENTOO_CONFIG_VER}"
 
 	local merge_configs=(
@@ -119,12 +116,12 @@ src_prepare() {
 	)
 
 	if use hardened; then
-		merge_configs+=( "${dist_conf_path}"/hardened-base.config )
+		merge_configs+=("${dist_conf_path}"/hardened-base.config)
 
-		tc-is-gcc && merge_configs+=( "${dist_conf_path}"/hardened-gcc-plugins.config )
+		tc-is-gcc && merge_configs+=("${dist_conf_path}"/hardened-gcc-plugins.config)
 
 		if [[ -f "${dist_conf_path}/hardened-${ARCH}.config" ]]; then
-			merge_configs+=( "${dist_conf_path}/hardened-${ARCH}.config" )
+			merge_configs+=("${dist_conf_path}/hardened-${ARCH}.config")
 		fi
 	fi
 
