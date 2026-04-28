@@ -40,7 +40,7 @@ src_install() {
 		einfo "Installing DSP config for detected model: ${model} (${model_dir})"
 
 		# Install WirePlumber DSP config
-		insinto /etc/wireplumber/wireplumber.conf.d
+		insinto /usr/share/wireplumber/wireplumber.conf.d
 		local f
 		for f in "config/${model_dir}"/*-dsp.conf; do
 			[[ -e ${f} ]] && doins "${f}"
