@@ -29,9 +29,8 @@ src_install() {
 	local model_dir=""
 
 	if [[ -n "${model}" ]]; then
-		# Remove prefix and replace comma with underscore (e.g. MacBookPro16,2 -> 16_2)
-		local stripped=${model#MacBookPro}
-		stripped=${stripped#MacBookAir}
+		# Remove all letters, keeping only numbers and the comma (e.g. MacBookPro16,2 -> 16,2)
+		local stripped=${model//[a-zA-Z]/}
 		if [[ ${stripped} == *,* ]]; then
 			model_dir=${stripped/,/_}
 		fi
