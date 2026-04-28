@@ -10,7 +10,7 @@ EGIT_REPO_URI="https://github.com/pierolenzo/alsa-ucm-conf-t2.git"
 
 LICENSE="MIT"
 SLOT="0"
-
+KEYWORDS="~amd64"
 RDEPEND="media-libs/alsa-ucm-conf"
 
 src_install() {
