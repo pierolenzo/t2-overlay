@@ -15,6 +15,7 @@ KEYWORDS=""
 
 RDEPEND="
 	media-plugins/swh-plugins
+	media-plugins/swh-lv2
 	media-video/pipewire[extra,lv2,sound-server]
 	media-video/wireplumber
 	media-libs/lsp-plugins[lv2]
@@ -38,7 +39,7 @@ src_install() {
 
 	if [[ -n "${model_dir}" && -d "config/${model_dir}" ]]; then
 		einfo "Installing DSP config for detected model: ${model} (${model_dir})"
-		
+
 		# Install WirePlumber DSP config
 		insinto /etc/wireplumber/wireplumber.conf.d
 		local f
@@ -50,7 +51,7 @@ src_install() {
 		insinto "/usr/share/t2-linux-audio/${model_dir}"
 		local files=()
 		for f in "firs/${model_dir}"/*; do
-			[[ -f ${f} ]] && files+=( "${f}" )
+			[[ -f ${f} ]] && files+=("${f}")
 		done
 		if [[ ${#files[@]} -gt 0 ]]; then
 			doins "${files[@]}"
@@ -77,3 +78,4 @@ pkg_postinst() {
 	einfo "If the DSP config was installed, restart the user services to apply it:"
 	einfo "  systemctl --user restart wireplumber pipewire pipewire-pulse"
 }
+
