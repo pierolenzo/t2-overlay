@@ -3,21 +3,18 @@
 
 EAPI=8
 
-KERNEL_IUSE_MODULES_SIGN=1
 KERNEL_IUSE_GENERIC_UKI=1
 inherit kernel-build toolchain-funcs verify-sig
 
 BASE_P=linux-${PV%.*}
 PATCH_PV=${PV%_p*}
-PATCHSET=linux-gentoo-patches-6.18.16
-
+PATCHSET=linux-gentoo-patches-7.0.1
 # https://koji.fedoraproject.org/koji/packageinfo?packageID=8
 # forked to https://github.com/projg2/fedora-kernel-config-for-gentoo
-
-CONFIG_VER=6.18.12-gentoo
+CONFIG_VER=7.0.1-gentoo
 GENTOO_CONFIG_VER=g18
-LINUX_T2_PATCHES_VER="547fa06ff16ae131f2ae1083b17946384ddeb755"
-SHA256SUM_DATE=20260319
+LINUX_T2_PATCHES_VER="e604fc07462cca9dd768a8a1b7590d5f71696690"
+SHA256SUM_DATE=20260430
 
 DESCRIPTION="Linux kernel built with Gentoo patches and t2linux patches"
 HOMEPAGE="
