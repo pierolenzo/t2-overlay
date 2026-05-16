@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+	<maintainer type="person">
+		<email>piero@example.com</email>
+		<name>Piero</name>
+	</maintainer>
+	<longdescription>
+		Middleware for the Italian Electronic Identity Card (CIE). 
+		This package provides the PKCS#11 library and the CIE ID application 
+		for managing and using the CIE smartcard.
+	</longdescription>
+	<upstream>
+		<remote-id type="github">italia/cie-middleware-linux</remote-id>
+	</upstream>
+</pkgmetadata>
