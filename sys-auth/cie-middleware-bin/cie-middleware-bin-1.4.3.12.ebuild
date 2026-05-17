@@ -7,7 +7,7 @@ inherit desktop multilib
 
 DESCRIPTION="Middleware for the Italian Electronic Identity Card (CIE)"
 HOMEPAGE="https://github.com/italia/cie-middleware-linux"
-SRC_URI="https://github.com/italia/cie-middleware-linux/releases/download/${PV}/CIE-Middleware-$(ver_rs 3 -).x86-64.tar.gz"
+SRC_URI="https://github.com/italia/cie-middleware-linux/releases/download/${PV}/CIE-Middleware-${PV%.*}-${PV##*.}.x86-64.tar.gz"
 
 LICENSE="BSD-3-Clause"
 SLOT="0"
