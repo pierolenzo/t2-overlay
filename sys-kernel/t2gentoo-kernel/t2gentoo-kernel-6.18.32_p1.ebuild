@@ -14,9 +14,9 @@ PATCHSET=linux-gentoo-patches-${PV}
 # forked to https://github.com/projg2/fedora-kernel-config-for-gentoo
 
 CONFIG_VER=6.18.12-gentoo
-GENTOO_CONFIG_VER=g18
+GENTOO_CONFIG_P=gentoo-kernel-config-g18
 LINUX_T2_PATCHES_VER="6d944013c8ac0b4ef3c62f0f643a322df1460862"
-SHA256SUM_DATE=20260515
+SHA256SUM_DATE=20260517
 
 DESCRIPTION="Linux kernel built with Gentoo patches and t2linux patches"
 HOMEPAGE="
@@ -28,8 +28,7 @@ SRC_URI+="
 	https://cdn.kernel.org/pub/linux/kernel/v$(ver_cut 1).x/${BASE_P}.tar.xz
 	https://cdn.kernel.org/pub/linux/kernel/v$(ver_cut 1).x/patch-${PATCH_PV}.xz
 	https://distfiles.gentoo.org/pub/proj/dist-kernel/patchsets/$(ver_cut 1-2)/${PATCHSET}.tar.xz
-	https://github.com/projg2/gentoo-kernel-config/archive/${GENTOO_CONFIG_VER}.tar.gz
-			-> gentoo-kernel-config-${GENTOO_CONFIG_VER}.tar.gz
+    https://gitweb.gentoo.org/proj/dist-kernel/gentoo-kernel-config.git/snapshot/${GENTOO_CONFIG_P}.tar.bz2
 	https://github.com/t2linux/linux-t2-patches/archive/${LINUX_T2_PATCHES_VER}.tar.gz
 			-> linux-t2-patches-${LINUX_T2_PATCHES_VER}.tar.gz
 	verify-sig? (
@@ -103,7 +102,7 @@ src_prepare() {
 	local myversion="-t2gentoo-dist"
 	use hardened && myversion+="-hardened"
 	echo "CONFIG_LOCALVERSION=\"${myversion}\"" >"${T}"/version.config || die
-	local dist_conf_path="${WORKDIR}/gentoo-kernel-config-${GENTOO_CONFIG_VER}"
+	local dist_conf_path="${WORKDIR}/${GENTOO_CONFIG_P}"
 
 	local merge_configs=(
 		"${T}"/version.config
