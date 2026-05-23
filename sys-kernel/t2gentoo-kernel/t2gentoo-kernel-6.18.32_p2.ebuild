@@ -15,7 +15,7 @@ PATCHSET=linux-gentoo-patches-${PV}
 
 CONFIG_VER=6.18.12-gentoo
 GENTOO_CONFIG_P=gentoo-kernel-config-g18
-LINUX_T2_PATCHES_VER="6d944013c8ac0b4ef3c62f0f643a322df1460862"
+LINUX_T2_PATCHES_VER="c42e136003894bfdb29ce8dd07362df9a5072ea9"
 SHA256SUM_DATE=20260517
 
 DESCRIPTION="Linux kernel built with Gentoo patches and t2linux patches"

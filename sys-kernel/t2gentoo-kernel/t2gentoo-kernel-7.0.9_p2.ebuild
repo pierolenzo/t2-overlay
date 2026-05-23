@@ -13,7 +13,7 @@ PATCHSET=linux-gentoo-patches-${PV}
 # forked to https://github.com/projg2/fedora-kernel-config-for-gentoo
 CONFIG_VER=7.0.8-gentoo
 GENTOO_CONFIG_P=gentoo-kernel-config-g18
-LINUX_T2_PATCHES_VER="1853af4aee576fb93e209fd26a4af0ecc669160a"
+LINUX_T2_PATCHES_VER="716093d3244566cd708362661de269ab7e67ff0f"
 SHA256SUM_DATE=20260517
 
 DESCRIPTION="Linux kernel built with Gentoo patches and t2linux patches"
