@@ -27,7 +27,7 @@ jobs:
             -v ${{ github.workspace }}/t2-overlay:/workspace \
             -w /workspace \
             gentoo/stage3:latest \
-            /bin/bash -c "set -e; emerge-webrsync -q; emerge -qg dev-vcs/git; python3 scripts/update_kernel.py"
+            /bin/bash -c "set -e; getuto; emerge-webrsync -q; emerge -qg dev-vcs/git; python3 scripts/update_kernel.py"
 
       - name: Commit and push changes
         run: |
