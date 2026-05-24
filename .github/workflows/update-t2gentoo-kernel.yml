@@ -1,0 +1,84 @@
+name: Update t2gentoo-kernel
+
+on:
+  schedule:
+    - cron: '0 2 * * *' # Esegue ogni giorno alle 2:00
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-ebuilds:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout overlay
+        uses: actions/checkout@v4
+        with:
+          path: t2-overlay
+          
+      - name: Sparse clone gentoo repository from Codeberg
+        run: |
+          mkdir -p t2-overlay/gentoo-upstream
+          cd t2-overlay/gentoo-upstream
+          git init
+          git remote add origin https://codeberg.org/gentoo/gentoo.git
+          git config core.sparseCheckout true
+          echo "sys-kernel/gentoo-kernel/" >> .git/info/sparse-checkout
+          echo "virtual/dist-kernel/" >> .git/info/sparse-checkout
+          echo "eclass/" >> .git/info/sparse-checkout
+          echo "profiles/" >> .git/info/sparse-checkout
+          echo "metadata/" >> .git/info/sparse-checkout
+          git pull --depth=1 origin master
+          
+      - name: Create local config for Portage
+        run: |
+          mkdir -p t2-overlay/repos.conf
+          cat <<EOF > t2-overlay/repos.conf/gentoo.conf
+          [DEFAULT]
+          main-repo = gentoo
+
+          [gentoo]
+          location = /workspace/gentoo-upstream
+          EOF
+          
+          cat <<EOF > t2-overlay/repos.conf/t2-overlay.conf
+          [t2-overlay]
+          location = /workspace
+          masters = gentoo
+          EOF
+
+      - name: Run update inside Gentoo container
+        env:
+          KERNEL_BRANCHES: "6.12 6.18 7.0 7.1"
+        run: |
+          set -e
+          docker --version
+          docker run --rm \
+            -v ${{ github.workspace }}/t2-overlay:/workspace \
+            -w /workspace \
+            gentoo/stage3:latest \
+            /bin/bash -c "set -e; mkdir -p /etc/portage/repos.conf && cp /workspace/repos.conf/* /etc/portage/repos.conf/ && emerge -qg dev-vcs/git && python3 scripts/update_kernel.py"
+          
+      - name: Commit and push changes
+        run: |
+          cd t2-overlay
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git add sys-kernel/t2gentoo-kernel/
+          git add virtual/dist-kernel/
+          
+          
+          if ! git diff --staged --quiet; then
+            if [ -f commit_message.txt ]; then
+              git commit -F commit_message.txt
+              rm commit_message.txt
+            else
+              git commit -m "Auto-update t2gentoo-kernel ebuilds and manifests"
+            fi
+            git push
+            echo "Changes pushed successfully."
+          else
+            echo "No changes to commit."
+          fi

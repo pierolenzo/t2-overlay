@@ -4,13 +4,14 @@
 EAPI=8
 
 KERNEL_IUSE_GENERIC_UKI=1
+
 inherit kernel-build toolchain-funcs verify-sig
 
 BASE_P=linux-${PV%.*}
 PATCH_PV=${PV%_p*}
 PATCHSET=linux-gentoo-patches-${PV}
 # https://koji.fedoraproject.org/koji/packageinfo?packageID=8
-# forked to https://github.com/projg2/fedora-kernel-config-for-gentoo
+# forked to git.gentoo.org:fork/fedora/kernel
 CONFIG_VER=7.0.8-gentoo
 GENTOO_CONFIG_P=gentoo-kernel-config-g19
 LINUX_T2_PATCHES_VER="716093d3244566cd708362661de269ab7e67ff0f"
@@ -29,19 +30,14 @@ SRC_URI+="
 	https://gitweb.gentoo.org/proj/dist-kernel/gentoo-kernel-config.git/snapshot/${GENTOO_CONFIG_P}.tar.bz2
 	https://gitweb.gentoo.org/fork/fedora/kernel.git/snapshot/kernel-${CONFIG_VER}.tar.bz2
 	https://github.com/t2linux/linux-t2-patches/archive/${LINUX_T2_PATCHES_VER}.tar.gz
-			-> linux-t2-patches-${LINUX_T2_PATCHES_VER}.tar.gz
+		-> linux-t2-patches-${LINUX_T2_PATCHES_VER}.tar.gz
 	verify-sig? (
-			https://cdn.kernel.org/pub/linux/kernel/v$(ver_cut 1).x/sha256sums.asc
-					-> linux-$(ver_cut 1).x-sha256sums-${SHA256SUM_DATE}.asc
-	)
-	amd64? (
-			https://raw.githubusercontent.com/projg2/fedora-kernel-config-for-gentoo/${CONFIG_VER}/kernel-x86_64-fedora.config
-					-> kernel-x86_64-fedora.config.${CONFIG_VER}
+		https://cdn.kernel.org/pub/linux/kernel/v$(ver_cut 1).x/sha256sums.asc
+			-> linux-$(ver_cut 1).x-sha256sums-${SHA256SUM_DATE}.asc
 	)
 "
 S=${WORKDIR}/${BASE_P}
 
-LICENSE="GPL-2"
 KEYWORDS="~amd64"
 IUSE="debug hardened"
 
@@ -59,6 +55,7 @@ PDEPEND="
 QA_FLAGS_IGNORED="
 	usr/src/linux-.*/scripts/gcc-plugins/.*.so
 	usr/src/linux-.*/vmlinux
+	usr/src/linux-.*/arch/powerpc/kernel/vdso.*/vdso.*.so.dbg
 "
 
 VERIFY_SIG_OPENPGP_KEY_PATH=/usr/share/openpgp-keys/kernel.org.asc
@@ -76,7 +73,6 @@ src_unpack() {
 }
 
 src_prepare() {
-
 	local patch
 	eapply "${WORKDIR}/patch-${PATCH_PV}"
 	eapply "${WORKDIR}/${PATCHSET}"
@@ -90,17 +86,17 @@ src_prepare() {
 
 	# prepare the default config
 	case ${ARCH} in
-	amd64)
-		cp "${DISTDIR}/kernel-x86_64-fedora.config.${CONFIG_VER}" .config || die
-		;;
-	*)
-		die "Unsupported arch ${ARCH}"
-		;;
+		amd64)
+			cp "${WORKDIR}/kernel-${CONFIG_VER}/kernel-x86_64-fedora.config" .config || die
+			;;
+		*)
+			die "Unsupported arch ${ARCH}"
+			;;
 	esac
 
 	local myversion="-t2gentoo-dist"
 	use hardened && myversion+="-hardened"
-	echo "CONFIG_LOCALVERSION=\"${myversion}\"" >"${T}"/version.config || die
+	echo "CONFIG_LOCALVERSION=\"${myversion}\"" > "${T}"/version.config || die
 	local dist_conf_path="${WORKDIR}/${GENTOO_CONFIG_P}"
 
 	local merge_configs=(
@@ -109,18 +105,16 @@ src_prepare() {
 		"${dist_conf_path}"/6.12+.config
 		"${WORKDIR}/linux-t2-patches-${LINUX_T2_PATCHES_VER}/extra_config"
 	)
-
 	use debug || merge_configs+=(
 		"${dist_conf_path}"/no-debug.config
 	)
-
 	if use hardened; then
-		merge_configs+=("${dist_conf_path}"/hardened-base.config)
+		merge_configs+=( "${dist_conf_path}"/hardened-base.config )
 
-		tc-is-gcc && merge_configs+=("${dist_conf_path}"/hardened-gcc-plugins.config)
+		tc-is-gcc && merge_configs+=( "${dist_conf_path}"/hardened-gcc-plugins.config )
 
 		if [[ -f "${dist_conf_path}/hardened-${ARCH}.config" ]]; then
-			merge_configs+=("${dist_conf_path}/hardened-${ARCH}.config")
+			merge_configs+=( "${dist_conf_path}/hardened-${ARCH}.config" )
 		fi
 	fi
 
