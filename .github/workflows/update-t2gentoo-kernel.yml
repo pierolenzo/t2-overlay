@@ -47,7 +47,7 @@ jobs:
 
       - name: Run update inside Gentoo container
         env:
-          KERNEL_BRANCHES: ${{ vars.KERNEL_BRANCHES }}
+          KERNEL_BRANCHES: "${{ vars.KERNEL_BRANCHES }}"
         run: |
           set -e
           docker --version
