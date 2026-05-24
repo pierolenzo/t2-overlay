@@ -83,8 +83,9 @@ def process_ebuild(upstream_filename, target_dir, sha):
     content = re.sub(r'REQUIRED_USE="[^"]*"', '', content)
     content = re.sub(r'(GENTOO_CONFIG_P=.*?)\n', r'\1\nLINUX_T2_PATCHES_VER="' + sha + r'"\n', content)
     
-    replacement = '\thttps://github.com/t2linux/linux-t2-patches/archive/${LINUX_T2_PATCHES_VER}.tar.gz\n\t\t\t-> linux-t2-patches-${LINUX_T2_PATCHES_VER}.tar.gz\n\t\\1'
-    content = re.sub(r'(verify-sig\? \()', replacement, content)
+    # Inject t2linux patches URL strictly into SRC_URI before the verify-sig block
+    replacement = '\thttps://github.com/t2linux/linux-t2-patches/archive/${LINUX_T2_PATCHES_VER}.tar.gz\n\t\t\t-> linux-t2-patches-${LINUX_T2_PATCHES_VER}.tar.gz\n\\1'
+    content = re.sub(r'(\n[ \t]*verify-sig\? \(\n[ \t]*https://cdn\.kernel\.org/pub/linux/kernel/)', replacement, content)
     
     content = re.sub(r'https://www.kernel.org/', 'https://www.kernel.org/\n\thttps://t2linux.org/', content)
     content = re.sub(r'DESCRIPTION="Linux kernel built with Gentoo patches"', 'DESCRIPTION="Linux kernel built with Gentoo patches and t2linux patches"', content)
