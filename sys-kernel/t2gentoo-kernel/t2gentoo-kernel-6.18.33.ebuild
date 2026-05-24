@@ -14,7 +14,7 @@ PATCHSET=linux-gentoo-patches-${PV}
 # forked to https://github.com/projg2/fedora-kernel-config-for-gentoo
 
 CONFIG_VER=6.18.12-gentoo
-GENTOO_CONFIG_P=gentoo-kernel-config-g18
+GENTOO_CONFIG_P=gentoo-kernel-config-g19
 LINUX_T2_PATCHES_VER="c42e136003894bfdb29ce8dd07362df9a5072ea9"
 SHA256SUM_DATE=20260517
 

@@ -12,9 +12,9 @@ PATCHSET=linux-gentoo-patches-${PV}
 # https://koji.fedoraproject.org/koji/packageinfo?packageID=8
 # forked to https://github.com/projg2/fedora-kernel-config-for-gentoo
 CONFIG_VER=7.0.8-gentoo
-GENTOO_CONFIG_P=gentoo-kernel-config-g18
+GENTOO_CONFIG_P=gentoo-kernel-config-g19
 LINUX_T2_PATCHES_VER="716093d3244566cd708362661de269ab7e67ff0f"
-SHA256SUM_DATE=20260517
+SHA256SUM_DATE=20260523
 
 DESCRIPTION="Linux kernel built with Gentoo patches and t2linux patches"
 HOMEPAGE="
