@@ -19,17 +19,14 @@ jobs:
           
       - name: Sparse clone gentoo repository from Codeberg
         run: |
-          mkdir -p t2-overlay/gentoo-upstream
+          # Usiamo --filter=blob:none (blobless clone) invece di --depth=1.
+          # Questo evita l'errore 504 Gateway Timeout su Codeberg, poiché
+          # scarica la struttura senza costringere il server a calcolare packfile troncati.
+          git clone --filter=blob:none --sparse https://codeberg.org/gentoo/gentoo.git t2-overlay/gentoo-upstream || \
+          git clone https://codeberg.org/gentoo/gentoo.git t2-overlay/gentoo-upstream
+          
           cd t2-overlay/gentoo-upstream
-          git init
-          git remote add origin https://codeberg.org/gentoo/gentoo.git
-          git config core.sparseCheckout true
-          echo "sys-kernel/gentoo-kernel/" >> .git/info/sparse-checkout
-          echo "virtual/dist-kernel/" >> .git/info/sparse-checkout
-          echo "eclass/" >> .git/info/sparse-checkout
-          echo "profiles/" >> .git/info/sparse-checkout
-          echo "metadata/" >> .git/info/sparse-checkout
-          git pull --depth=1 origin master
+          git sparse-checkout set sys-kernel/gentoo-kernel virtual/dist-kernel eclass profiles metadata
           
       - name: Create local config for Portage
         run: |
