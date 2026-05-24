@@ -6,14 +6,16 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   update-ebuilds:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout overlay
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           path: t2-overlay
 
@@ -26,7 +28,7 @@ jobs:
           docker run --rm \
             -v ${{ github.workspace }}/t2-overlay:/workspace \
             -w /workspace \
-            gentoo/stage3:latest \
+            gentoo/stage3@sha256:ed25f59f219c7e48601e19048b3d0b91a4d471868e4413d4fddb5a81d9d0fe49 # latest \
             /bin/bash -c "set -e; getuto; emerge-webrsync -q; emerge -qg dev-vcs/git; python3 scripts/update_kernel.py"
 
       - name: Commit and push changes
