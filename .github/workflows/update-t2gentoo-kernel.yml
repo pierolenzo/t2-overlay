@@ -17,34 +17,6 @@ jobs:
         with:
           path: t2-overlay
 
-      - name: Sparse clone gentoo repository from Codeberg
-        run: |
-          # Usiamo --filter=blob:none (blobless clone) invece di --depth=1.
-          # Questo evita l'errore 504 Gateway Timeout su Codeberg, poiché
-          # scarica la struttura senza costringere il server a calcolare packfile troncati.
-          git clone --filter=blob:none --sparse https://codeberg.org/gentoo/gentoo.git t2-overlay/gentoo-upstream || \
-          git clone https://codeberg.org/gentoo/gentoo.git t2-overlay/gentoo-upstream
-
-          cd t2-overlay/gentoo-upstream
-          git sparse-checkout set sys-kernel/gentoo-kernel virtual/dist-kernel eclass profiles metadata
-
-      - name: Create local config for Portage
-        run: |
-          mkdir -p t2-overlay/repos.conf
-          cat <<EOF > t2-overlay/repos.conf/gentoo.conf
-          [DEFAULT]
-          main-repo = gentoo
-
-          [gentoo]
-          location = /workspace/gentoo-upstream
-          EOF
-
-          cat <<EOF > t2-overlay/repos.conf/t2-overlay.conf
-          [t2-overlay]
-          location = /workspace
-          masters = gentoo
-          EOF
-
       - name: Run update inside Gentoo container
         env:
           KERNEL_BRANCHES: "${{ vars.KERNEL_BRANCHES }}"
@@ -55,7 +27,7 @@ jobs:
             -v ${{ github.workspace }}/t2-overlay:/workspace \
             -w /workspace \
             gentoo/stage3:latest \
-            /bin/bash -c "set -e; mkdir -p /etc/portage/repos.conf && cp /workspace/repos.conf/* /etc/portage/repos.conf/ && emerge -qg dev-vcs/git && python3 scripts/update_kernel.py"
+            /bin/bash -c "set -e; emerge-webrsync -q; emerge -qg dev-vcs/git; python3 scripts/update_kernel.py"
 
       - name: Commit and push changes
         run: |

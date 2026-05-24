@@ -5,6 +5,8 @@ import subprocess
 import glob
 import sys
 import logging
+import json
+import urllib.request
 
 logging.basicConfig(
     level=logging.INFO,
@@ -12,13 +14,37 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stdout)]
 )
 
-
 OVERLAY_DIR = os.environ.get("GITHUB_WORKSPACE", os.getcwd())
 if OVERLAY_DIR == '/workspace':
     # Running inside docker
     pass
-UPSTREAM_DIR = os.path.join(OVERLAY_DIR, "gentoo-upstream")
 BRANCHES = os.environ.get("KERNEL_BRANCHES", "6.12 6.18 7.0 7.1").split()
+
+_api_cache = {}
+def get_codeberg_dir_files(path):
+    if path in _api_cache:
+        return _api_cache[path]
+    url = f"https://codeberg.org/api/v1/repos/gentoo/gentoo/contents/{path}?ref=master"
+    req = urllib.request.Request(url)
+    try:
+        response = urllib.request.urlopen(req)
+        data = json.loads(response.read().decode('utf-8'))
+        files = [f['name'] for f in data if f['name'].endswith('.ebuild')]
+        _api_cache[path] = files
+        return files
+    except Exception as e:
+        logging.error(f"Error fetching API {url}: {e}")
+        return []
+
+def get_codeberg_raw_file(path, filename):
+    url = f"https://codeberg.org/gentoo/gentoo/raw/branch/master/{path}/{filename}"
+    req = urllib.request.Request(url)
+    try:
+        response = urllib.request.urlopen(req)
+        return response.read().decode('utf-8')
+    except Exception as e:
+        logging.error(f"Error downloading {url}: {e}")
+        return None
 
 def get_latest_t2_sha(branch):
     try:
@@ -30,24 +56,27 @@ def get_latest_t2_sha(branch):
     return None
 
 def get_highest_gentoo_version(branch):
-    ebuilds = glob.glob(os.path.join(UPSTREAM_DIR, 'sys-kernel', 'gentoo-kernel', f'gentoo-kernel-{branch}.*.ebuild'))
-    if not ebuilds:
+    files = get_codeberg_dir_files('sys-kernel/gentoo-kernel')
+    prefix = f"gentoo-kernel-{branch}."
+    branch_ebuilds = [f for f in files if f.startswith(prefix)]
+    if not branch_ebuilds:
         return None
     
     def parse_ver(p):
-        v = os.path.basename(p)[14:-7] # remove gentoo-kernel- and .ebuild
+        v = p[14:-7] # remove gentoo-kernel- and .ebuild
         parts = v.split('_p')
         base = parts[0].split('.')
         base = [int(x) for x in base]
         patch = int(parts[1]) if len(parts) > 1 else 0
         return (base, patch)
     
-    ebuilds.sort(key=parse_ver)
-    return ebuilds[-1]
+    branch_ebuilds.sort(key=parse_ver)
+    return branch_ebuilds[-1]
 
-def process_ebuild(upstream_path, target_dir, sha):
-    with open(upstream_path, 'r') as f:
-        content = f.read()
+def process_ebuild(upstream_filename, target_dir, sha):
+    content = get_codeberg_raw_file('sys-kernel/gentoo-kernel', upstream_filename)
+    if not content:
+        return None
 
     # Apply transformations
     content = re.sub(r'KEYWORDS=".*?"', 'KEYWORDS="~amd64"', content)
@@ -80,9 +109,10 @@ def process_ebuild(upstream_path, target_dir, sha):
     
     return content
 
-def process_virtual(upstream_virtual_path, virtual_dir, target_version):
-    with open(upstream_virtual_path, 'r') as f:
-        content = f.read()
+def process_virtual(upstream_virtual_filename, virtual_dir, target_version):
+    content = get_codeberg_raw_file('virtual/dist-kernel', upstream_virtual_filename)
+    if not content:
+        return None
         
     # Restrict architectures
     content = re.sub(r'KEYWORDS=".*?"', 'KEYWORDS="~amd64"', content)
@@ -115,7 +145,7 @@ def main():
             logging.warning(f"Could not find gentoo-kernel for branch {branch}")
             continue
             
-        version = os.path.basename(upstream_ebuild)[14:-7]
+        version = upstream_ebuild[14:-7]
         target_ebuild_name = f"t2gentoo-kernel-{version}.ebuild"
         
         target_path = os.path.join(kernel_dir, target_ebuild_name)
@@ -151,27 +181,33 @@ def main():
             logging.info(f"Updating {branch} to {os.path.basename(target_file)} with SHA {sha}")
             updates_made.append(f"Update {branch}: {os.path.basename(target_file)} (t2-patch SHA: {sha[:8]})")
             content = process_ebuild(upstream_ebuild, kernel_dir, sha)
+            if not content:
+                logging.error(f"Failed to process ebuild {upstream_ebuild}")
+                continue
             with open(target_file, 'w') as f:
                 f.write(content)
                 
             virt_target_version = os.path.basename(target_file)[16:-7]
-            upstream_virtual_path = os.path.join(UPSTREAM_DIR, 'virtual', 'dist-kernel', f"dist-kernel-{version}.ebuild")
-            if not os.path.exists(upstream_virtual_path):
-                # Fallback if gentoo removed exact version, find highest in branch
-                virt_ebuilds = glob.glob(os.path.join(UPSTREAM_DIR, 'virtual', 'dist-kernel', f'dist-kernel-{branch}.*.ebuild'))
-                if virt_ebuilds:
-                    virt_ebuilds.sort()
-                    upstream_virtual_path = virt_ebuilds[-1]
             
-            if os.path.exists(upstream_virtual_path):
-                virt_path = process_virtual(upstream_virtual_path, virtual_dir, virt_target_version)
+            # Find the correct virtual ebuild
+            virt_files = get_codeberg_dir_files('virtual/dist-kernel')
+            upstream_virtual_filename = f"dist-kernel-{version}.ebuild"
+            if upstream_virtual_filename not in virt_files:
+                # Fallback if gentoo removed exact version, find highest in branch
+                branch_virt_ebuilds = [f for f in virt_files if f.startswith(f"dist-kernel-{branch}.")]
+                if branch_virt_ebuilds:
+                    branch_virt_ebuilds.sort()
+                    upstream_virtual_filename = branch_virt_ebuilds[-1]
+                else:
+                    upstream_virtual_filename = None
+            
+            virt_path = None
+            if upstream_virtual_filename:
+                virt_path = process_virtual(upstream_virtual_filename, virtual_dir, virt_target_version)
             else:
                 logging.warning(f"Could not find upstream virtual for {version}")
-                virt_path = None
             
-            # Use gentoo-upstream repo as the default repo to resolve eclasses
             env = os.environ.copy()
-            # Generate manifests
             subprocess.run(['ebuild', target_file, 'manifest'], check=True, env=env)
             if virt_path:
                 subprocess.run(['ebuild', virt_path, 'manifest'], check=True, env=env)
