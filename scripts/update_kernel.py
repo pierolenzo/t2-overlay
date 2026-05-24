@@ -119,7 +119,7 @@ def process_virtual(upstream_virtual_filename, virtual_dir, target_version):
     content = re.sub(r'KEYWORDS=".*?"', 'KEYWORDS="~amd64"', content)
     
     # Inject t2gentoo-kernel into RDEPEND
-    content = re.sub(r'(\|\s*\(\s*)', r'\1\n\t\t~sys-kernel/t2gentoo-kernel-${PV}', content)
+    content = re.sub(r'(\|\s*\(\s*)', r'\1\n\t\t~sys-kernel/t2gentoo-kernel-${PV}\n\t\t', content)
     
     virtual_path = os.path.join(virtual_dir, f"dist-kernel-{target_version}.ebuild")
     os.makedirs(virtual_dir, exist_ok=True)
