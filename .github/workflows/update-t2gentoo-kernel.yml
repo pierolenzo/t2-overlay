@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: update-t2gentoo-kernel
+  cancel-in-progress: false
+
 jobs:
   update-ebuilds:
     runs-on: ubuntu-latest
@@ -23,19 +27,22 @@ jobs:
         env:
           KERNEL_BRANCHES: "${{ vars.KERNEL_BRANCHES }}"
         run: |
-          set -e
+          set -euo pipefail
           docker --version
+          # gentoo/stage3 pinned digest.
           docker run --rm \
-            -v ${{ github.workspace }}/t2-overlay:/workspace \
+            -v "${{ github.workspace }}/t2-overlay:/workspace" \
             -w /workspace \
-            gentoo/stage3@sha256:ed25f59f219c7e48601e19048b3d0b91a4d471868e4413d4fddb5a81d9d0fe49 # latest \
-            /bin/bash -c "set -e; getuto; emerge-webrsync -q; emerge -qg dev-vcs/git; python3 scripts/update_kernel.py"
+            -e KERNEL_BRANCHES \
+            gentoo/stage3@sha256:ed25f59f219c7e48601e19048b3d0b91a4d471868e4413d4fddb5a81d9d0fe49 \
+            /bin/bash -c "set -euo pipefail; getuto; emerge-webrsync -q; emerge -qg dev-vcs/git; python3 scripts/update_kernel.py"
 
       - name: Commit and push changes
         run: |
+          set -euo pipefail
           cd t2-overlay
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
           git add sys-kernel/t2gentoo-kernel/
           git add virtual/dist-kernel/
