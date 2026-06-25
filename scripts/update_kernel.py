@@ -47,7 +47,7 @@ def get_ebuild_version(filename, package):
     suffix = ".ebuild"
     if not name.startswith(prefix) or not name.endswith(suffix):
         raise ValueError(f"{name} is not a {package} ebuild")
-    return name[len(prefix):-len(suffix)]
+    return name[len(prefix) : -len(suffix)]
 
 
 def split_ebuild_revision(version):
@@ -145,7 +145,7 @@ def get_latest_t2_sha(branch):
             [
                 "git",
                 "ls-remote",
-                "https://github.com/t2linux/linux-t2-patches.git",
+                "https://github.com/pierolenzo/linux-t2-patches.git",
                 f"refs/heads/{git_branch}",
             ],
             stderr=subprocess.STDOUT,
@@ -157,7 +157,9 @@ def get_latest_t2_sha(branch):
             f"git ls-remote failed for t2linux branch {git_branch}: {exc.output.strip()}"
         ) from exc
     except subprocess.TimeoutExpired as exc:
-        raise UpdateError(f"git ls-remote timed out for t2linux branch {git_branch}") from exc
+        raise UpdateError(
+            f"git ls-remote timed out for t2linux branch {git_branch}"
+        ) from exc
 
     if not out.strip():
         raise UpdateError(f"No t2linux branch found for {git_branch}")
@@ -173,10 +175,14 @@ def get_highest_branch_ebuild(files, package, branch):
     try:
         return max(
             branch_ebuilds,
-            key=lambda filename: parse_version_key(get_ebuild_version(filename, package)),
+            key=lambda filename: parse_version_key(
+                get_ebuild_version(filename, package)
+            ),
         )
     except ValueError as exc:
-        raise UpdateError(f"Could not parse upstream {package} ebuild version: {exc}") from exc
+        raise UpdateError(
+            f"Could not parse upstream {package} ebuild version: {exc}"
+        ) from exc
 
 
 def get_highest_gentoo_version(branch):
@@ -199,7 +205,7 @@ def transform_ebuild(content, sha):
 
     replacement = (
         "\n\t"
-        "https://github.com/t2linux/linux-t2-patches/archive/${LINUX_T2_PATCHES_VER}.tar.gz"
+        "https://github.com/pierolenzo/linux-t2-patches/archive/${LINUX_T2_PATCHES_VER}.tar.gz"
         "\n\t\t\t-> linux-t2-patches-${LINUX_T2_PATCHES_VER}.tar.gz\\1"
     )
     content = replace_once(
@@ -253,7 +259,9 @@ def transform_ebuild(content, sha):
     content = replace_once(
         content,
         r'("\$\{dist_conf_path\}"/6\.12\+\.config)',
-        r'\1' + "\n\t\t" + r'"${WORKDIR}/linux-t2-patches-${LINUX_T2_PATCHES_VER}/extra_config"',
+        r"\1"
+        + "\n\t\t"
+        + r'"${WORKDIR}/linux-t2-patches-${LINUX_T2_PATCHES_VER}/extra_config"',
         "t2linux extra_config",
     )
 
@@ -267,9 +275,19 @@ def transform_ebuild(content, sha):
     )
 
     require_contains(content, f'LINUX_T2_PATCHES_VER="{sha}"', "t2linux patch SHA")
-    require_contains(content, "linux-t2-patches-${LINUX_T2_PATCHES_VER}.tar.gz", "t2linux SRC_URI")
-    require_contains(content, 'eapply "${WORKDIR}/linux-t2-patches-${LINUX_T2_PATCHES_VER}"', "t2linux eapply")
-    require_contains(content, '"${WORKDIR}/linux-t2-patches-${LINUX_T2_PATCHES_VER}/extra_config"', "t2linux extra_config")
+    require_contains(
+        content, "linux-t2-patches-${LINUX_T2_PATCHES_VER}.tar.gz", "t2linux SRC_URI"
+    )
+    require_contains(
+        content,
+        'eapply "${WORKDIR}/linux-t2-patches-${LINUX_T2_PATCHES_VER}"',
+        "t2linux eapply",
+    )
+    require_contains(
+        content,
+        '"${WORKDIR}/linux-t2-patches-${LINUX_T2_PATCHES_VER}/extra_config"',
+        "t2linux extra_config",
+    )
     require_contains(content, 'KEYWORDS="~amd64"', "restricted KEYWORDS")
     return content
 
@@ -280,7 +298,9 @@ def process_ebuild(upstream_filename, sha):
 
 
 def transform_virtual(content):
-    content = replace_once(content, r'KEYWORDS=".*?"', 'KEYWORDS="~amd64"', "virtual KEYWORDS")
+    content = replace_once(
+        content, r'KEYWORDS=".*?"', 'KEYWORDS="~amd64"', "virtual KEYWORDS"
+    )
     content = replace_once(
         content,
         r"(^[ \t]*\|\| \(\n)",
@@ -288,7 +308,9 @@ def transform_virtual(content):
         "virtual dist-kernel dependency alternatives",
         flags=re.MULTILINE,
     )
-    require_contains(content, "~sys-kernel/t2gentoo-kernel-${PV}", "t2gentoo virtual dependency")
+    require_contains(
+        content, "~sys-kernel/t2gentoo-kernel-${PV}", "t2gentoo virtual dependency"
+    )
     return content
 
 
@@ -306,7 +328,9 @@ def write_virtual(content, virtual_dir, target_version):
 
 
 def process_virtual(upstream_virtual_filename, virtual_dir, target_version):
-    return write_virtual(render_virtual(upstream_virtual_filename), virtual_dir, target_version)
+    return write_virtual(
+        render_virtual(upstream_virtual_filename), virtual_dir, target_version
+    )
 
 
 def find_existing_ebuilds(package_dir, package, base_version):
@@ -340,18 +364,24 @@ def select_target_version(kernel_dir, upstream_version, sha):
 
     latest_existing = max(
         existing_ebuilds,
-        key=lambda path: parse_version_key(
-            get_ebuild_version(path, "t2gentoo-kernel")
-        ),
+        key=lambda path: parse_version_key(get_ebuild_version(path, "t2gentoo-kernel")),
     )
     latest_version = get_ebuild_version(latest_existing, "t2gentoo-kernel")
     _latest_base, latest_revision = split_ebuild_revision(latest_version)
     current_sha = read_current_t2_sha(latest_existing)
 
     if latest_revision < upstream_revision:
-        return format_ebuild_version(upstream_base, upstream_revision), True, current_sha
+        return (
+            format_ebuild_version(upstream_base, upstream_revision),
+            True,
+            current_sha,
+        )
     if current_sha != sha:
-        return format_ebuild_version(upstream_base, latest_revision + 1), True, current_sha
+        return (
+            format_ebuild_version(upstream_base, latest_revision + 1),
+            True,
+            current_sha,
+        )
     return latest_version, False, current_sha
 
 
@@ -411,7 +441,9 @@ def process_branch(branch, kernel_dir, virtual_dir):
 
 
 def write_commit_message(updates_made):
-    with open(os.path.join(OVERLAY_DIR, "commit_message.txt"), "w", encoding="utf-8") as handle:
+    with open(
+        os.path.join(OVERLAY_DIR, "commit_message.txt"), "w", encoding="utf-8"
+    ) as handle:
         handle.write("Auto-update t2gentoo-kernel ebuilds\n\n")
         for update in updates_made:
             handle.write(f"- {update}\n")
