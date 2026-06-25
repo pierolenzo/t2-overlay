@@ -25,7 +25,7 @@ jobs:
 
       - name: Run update inside Gentoo container
         env:
-          KERNEL_BRANCHES: "${{ vars.KERNEL_BRANCHES }}"
+          KERNEL_PATCH_BRANCH_MAP: "${{ vars.KERNEL_PATCH_BRANCH_MAP }}"
         run: |
           set -euo pipefail
           docker --version
@@ -33,7 +33,7 @@ jobs:
           docker run --rm \
             -v "${{ github.workspace }}/t2-overlay:/workspace" \
             -w /workspace \
-            -e KERNEL_BRANCHES \
+            -e KERNEL_PATCH_BRANCH_MAP \
             gentoo/stage3@sha256:ed25f59f219c7e48601e19048b3d0b91a4d471868e4413d4fddb5a81d9d0fe49 \
             /bin/bash -c "set -euo pipefail; getuto; emerge-webrsync -q; emerge -qg dev-vcs/git; python3 scripts/update_kernel.py"
 

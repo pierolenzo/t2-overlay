@@ -29,8 +29,16 @@ class UpdateError(RuntimeError):
 
 
 def get_configured_branches():
-    branches = os.environ.get("KERNEL_BRANCHES", "").split()
-    return branches or list(DEFAULT_BRANCHES)
+    env_map = os.environ.get("KERNEL_PATCH_BRANCH_MAP")
+    if env_map is not None:
+        branches = []
+        normalized_map = env_map.replace(",", " ")
+        for item in normalized_map.split():
+            if ":" in item:
+                k, _v = item.split(":", 1)
+                branches.append(k)
+        return branches
+    return list(DEFAULT_BRANCHES)
 
 
 def get_ebuild_version(filename, package):
@@ -114,14 +122,31 @@ def get_codeberg_raw_file(path, filename):
         raise UpdateError(f"Error downloading {url}: {exc}") from exc
 
 
+def get_patch_branch(branch):
+    mapping = {}
+    env_map = os.environ.get("KERNEL_PATCH_BRANCH_MAP")
+    if env_map is not None:
+        normalized_map = env_map.replace(",", " ")
+        for item in normalized_map.split():
+            if ":" in item:
+                k, v = item.split(":", 1)
+                mapping[k] = v
+
+    for k in sorted(mapping.keys(), key=len, reverse=True):
+        if branch == k or branch.startswith(k):
+            return mapping[k]
+    return branch
+
+
 def get_latest_t2_sha(branch):
+    git_branch = get_patch_branch(branch)
     try:
         out = subprocess.check_output(
             [
                 "git",
                 "ls-remote",
                 "https://github.com/t2linux/linux-t2-patches.git",
-                f"refs/heads/{branch}",
+                f"refs/heads/{git_branch}",
             ],
             stderr=subprocess.STDOUT,
             text=True,
@@ -129,13 +154,13 @@ def get_latest_t2_sha(branch):
         )
     except subprocess.CalledProcessError as exc:
         raise UpdateError(
-            f"git ls-remote failed for t2linux branch {branch}: {exc.output.strip()}"
+            f"git ls-remote failed for t2linux branch {git_branch}: {exc.output.strip()}"
         ) from exc
     except subprocess.TimeoutExpired as exc:
-        raise UpdateError(f"git ls-remote timed out for t2linux branch {branch}") from exc
+        raise UpdateError(f"git ls-remote timed out for t2linux branch {git_branch}") from exc
 
     if not out.strip():
-        raise UpdateError(f"No t2linux branch found for {branch}")
+        raise UpdateError(f"No t2linux branch found for {git_branch}")
     return out.split()[0]
 
 

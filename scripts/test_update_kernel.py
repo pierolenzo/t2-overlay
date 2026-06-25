@@ -3,6 +3,7 @@ import os
 import sys
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 
@@ -154,19 +155,113 @@ class TransformTests(unittest.TestCase):
 
 
 class BranchConfigTests(unittest.TestCase):
-    def test_blank_kernel_branches_uses_defaults(self):
-        original = os.environ.get("KERNEL_BRANCHES")
-        os.environ["KERNEL_BRANCHES"] = ""
+    def setUp(self):
+        self.original_map = os.environ.get("KERNEL_PATCH_BRANCH_MAP")
+
+    def tearDown(self):
+        if self.original_map is None:
+            os.environ.pop("KERNEL_PATCH_BRANCH_MAP", None)
+        else:
+            os.environ["KERNEL_PATCH_BRANCH_MAP"] = self.original_map
+
+    def test_default_uses_default_branches(self):
+        os.environ.pop("KERNEL_PATCH_BRANCH_MAP", None)
+        self.assertEqual(
+            update_kernel.get_configured_branches(),
+            list(update_kernel.DEFAULT_BRANCHES),
+        )
+
+    def test_configured_branches_from_map(self):
+        os.environ["KERNEL_PATCH_BRANCH_MAP"] = "7.0:main 7.1:main 6.18:6.18"
+        self.assertEqual(
+            update_kernel.get_configured_branches(),
+            ["7.0", "7.1", "6.18"],
+        )
+
+    def test_configured_branches_from_map_with_commas(self):
+        os.environ["KERNEL_PATCH_BRANCH_MAP"] = "7.0:main,7.1:main, 6.18:6.18"
+        self.assertEqual(
+            update_kernel.get_configured_branches(),
+            ["7.0", "7.1", "6.18"],
+        )
+
+    def test_configured_branches_empty_map(self):
+        os.environ["KERNEL_PATCH_BRANCH_MAP"] = ""
+        self.assertEqual(
+            update_kernel.get_configured_branches(),
+            [],
+        )
+
+
+class GetLatestT2ShaTests(unittest.TestCase):
+    @unittest.mock.patch("subprocess.check_output")
+    def test_get_latest_t2_sha_non_v7(self, mock_check_output):
+        mock_check_output.return_value = "abcdef1234567890\trefs/heads/6.12\n"
+        sha = update_kernel.get_latest_t2_sha("6.12")
+        self.assertEqual(sha, "abcdef1234567890")
+        mock_check_output.assert_called_once()
+        args, kwargs = mock_check_output.call_args
+        self.assertEqual(args[0][3], "refs/heads/6.12")
+
+    @unittest.mock.patch("subprocess.check_output")
+    def test_get_latest_t2_sha_v7(self, mock_check_output):
+        original_map = os.environ.get("KERNEL_PATCH_BRANCH_MAP")
+        os.environ["KERNEL_PATCH_BRANCH_MAP"] = "7:main"
         try:
-            self.assertEqual(
-                update_kernel.get_configured_branches(),
-                list(update_kernel.DEFAULT_BRANCHES),
-            )
+            mock_check_output.return_value = "7777777777777777\trefs/heads/main\n"
+            for version in ("7.0", "7.1", "7"):
+                mock_check_output.reset_mock()
+                sha = update_kernel.get_latest_t2_sha(version)
+                self.assertEqual(sha, "7777777777777777")
+                mock_check_output.assert_called_once()
+                args, kwargs = mock_check_output.call_args
+                self.assertEqual(args[0][3], "refs/heads/main")
         finally:
-            if original is None:
-                os.environ.pop("KERNEL_BRANCHES", None)
+            if original_map is None:
+                os.environ.pop("KERNEL_PATCH_BRANCH_MAP", None)
             else:
-                os.environ["KERNEL_BRANCHES"] = original
+                os.environ["KERNEL_PATCH_BRANCH_MAP"] = original_map
+
+
+class GetPatchBranchTests(unittest.TestCase):
+    def setUp(self):
+        self.original_map = os.environ.get("KERNEL_PATCH_BRANCH_MAP")
+
+    def tearDown(self):
+        if self.original_map is None:
+            os.environ.pop("KERNEL_PATCH_BRANCH_MAP", None)
+        else:
+            os.environ["KERNEL_PATCH_BRANCH_MAP"] = self.original_map
+
+    def test_default_mapping(self):
+        os.environ.pop("KERNEL_PATCH_BRANCH_MAP", None)
+        self.assertEqual(update_kernel.get_patch_branch("7.0"), "7.0")
+        self.assertEqual(update_kernel.get_patch_branch("7.1"), "7.1")
+        self.assertEqual(update_kernel.get_patch_branch("7"), "7")
+        self.assertEqual(update_kernel.get_patch_branch("6.12"), "6.12")
+
+    def test_custom_mapping(self):
+        os.environ["KERNEL_PATCH_BRANCH_MAP"] = "7.0:main 7.1:custom-branch 6.18:main"
+        self.assertEqual(update_kernel.get_patch_branch("7.0"), "main")
+        self.assertEqual(update_kernel.get_patch_branch("7.1"), "custom-branch")
+        self.assertEqual(update_kernel.get_patch_branch("6.18"), "main")
+        self.assertEqual(update_kernel.get_patch_branch("6.12"), "6.12")
+
+    def test_empty_mapping(self):
+        os.environ["KERNEL_PATCH_BRANCH_MAP"] = ""
+        self.assertEqual(update_kernel.get_patch_branch("7.0"), "7.0")
+        self.assertEqual(update_kernel.get_patch_branch("7.1"), "7.1")
+
+    def test_longest_prefix_wins(self):
+        os.environ["KERNEL_PATCH_BRANCH_MAP"] = "7:main 7.1:specific-branch"
+        self.assertEqual(update_kernel.get_patch_branch("7.0"), "main")
+        self.assertEqual(update_kernel.get_patch_branch("7.1"), "specific-branch")
+
+    def test_comma_separated_mapping(self):
+        os.environ["KERNEL_PATCH_BRANCH_MAP"] = "7:main, 6.18:6.18"
+        self.assertEqual(update_kernel.get_patch_branch("7.0"), "main")
+        self.assertEqual(update_kernel.get_patch_branch("6.18"), "6.18")
+        self.assertEqual(update_kernel.get_patch_branch("6.12"), "6.12")
 
 
 if __name__ == "__main__":
