@@ -48,6 +48,7 @@ src_prepare() {
 \tesac
 
 \tlocal myversion="-gentoo-dist"
+\tlocal extraversion=${PV#${PATCH_PV}}
 \tlocal dist_conf_path="${WORKDIR}/${GENTOO_CONFIG_P}"
 \tlocal merge_configs=(
 \t\t"${T}"/version.config
@@ -140,6 +141,7 @@ class TransformTests(unittest.TestCase):
             generated,
         )
         self.assertIn('myversion="-t2gentoo-dist"', generated)
+        self.assertIn('local extraversion=${PVR#${PATCH_PV}}', generated)
         self.assertNotIn("REQUIRED_USE=", generated)
 
     def test_transform_ebuild_fails_when_upstream_shape_changes(self):

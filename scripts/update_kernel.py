@@ -258,6 +258,12 @@ def transform_ebuild(content, sha):
     )
     content = replace_once(
         content,
+        r'local extraversion=\$\{PV\#\$\{PATCH_PV\}\}',
+        'local extraversion=${PVR#${PATCH_PV}}',
+        "extraversion using PVR",
+    )
+    content = replace_once(
+        content,
         r'("\$\{dist_conf_path\}"/6\.12\+\.config)',
         r"\1"
         + "\n\t\t"
