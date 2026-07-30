@@ -6,8 +6,8 @@ EAPI=8
 inherit desktop unpacker xdg
 
 DESCRIPTION="TradingView Desktop Application"
-HOMEPAGE="https://www.tradingview.com/"
-SRC_URI="https://tvd-packages.tradingview.com/ubuntu/testing/binary/tradingview_amd64.deb -> ${P}.deb"
+HOMEPAGE="https://www.tradingview.com/desktop/"
+SRC_URI="https://tvd-packages.tradingview.com/ubuntu/stable/latest/jammy/tradingview_amd64.deb -> ${P}.deb"
 
 LICENSE="all-rights-reserved"
 SLOT="0"
