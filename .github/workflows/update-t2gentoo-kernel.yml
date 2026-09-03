@@ -23,6 +23,20 @@ jobs:
         with:
           path: t2-overlay
 
+      - name: Sync linux-t2-patches fork with upstream
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::warning::GH_PAT not configured in t2-overlay repository secrets. Skipping linux-t2-patches sync."
+            exit 0
+          fi
+          echo "Syncing pierolenzo/linux-t2-patches branches from upstream..."
+          for branch in main 6.18; do
+            echo "--- Syncing branch: $branch ---"
+            gh repo sync pierolenzo/linux-t2-patches --source t2linux/linux-t2-patches -b "$branch" --force || true
+          done
+
       - name: Run update inside Gentoo container
         env:
           KERNEL_PATCH_BRANCH_MAP: "${{ vars.KERNEL_PATCH_BRANCH_MAP }}"
