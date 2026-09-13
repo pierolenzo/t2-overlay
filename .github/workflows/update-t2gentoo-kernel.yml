@@ -28,14 +28,32 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
           if [ -z "${GH_TOKEN:-}" ]; then
-            echo "::warning::GH_PAT not configured in t2-overlay repository secrets. Skipping linux-t2-patches sync."
-            exit 0
+            echo "::error title=Missing Secret::GH_PAT is not configured in t2-overlay repository secrets. Cannot sync linux-t2-patches."
+            exit 1
           fi
+
           echo "Syncing pierolenzo/linux-t2-patches branches from upstream..."
+          FAILED_BRANCHES=()
+
           for branch in main 6.18; do
             echo "--- Syncing branch: $branch ---"
-            gh repo sync pierolenzo/linux-t2-patches --source t2linux/linux-t2-patches -b "$branch" --force || true
+            if ! OUTPUT=$(gh repo sync pierolenzo/linux-t2-patches --source t2linux/linux-t2-patches -b "$branch" --force 2>&1); then
+              echo "$OUTPUT"
+              if echo "$OUTPUT" | grep -qi "workflow"; then
+                echo "::error title=Missing Workflow Permission (branch $branch)::Upstream commits contain workflow changes. Your GH_PAT token requires the 'workflow' scope (or 'Workflows: Read and write' in fine-grained tokens)."
+              else
+                echo "::error title=Sync Failed (branch $branch)::Failed to sync branch '$branch': $OUTPUT"
+              fi
+              FAILED_BRANCHES+=("$branch")
+            else
+              echo "$OUTPUT"
+            fi
           done
+
+          if [ ${#FAILED_BRANCHES[@]} -gt 0 ]; then
+            echo "::error::Synchronization aborted for branches: ${FAILED_BRANCHES[*]}. Terminating workflow to prevent kernel ebuild generation with stale patches."
+            exit 1
+          fi
 
       - name: Run update inside Gentoo container
         env:
