@@ -89,7 +89,7 @@ src_prepare() {
 	# prepare the default config
 	case ${ARCH} in
 		amd64)
-			cp "${WORKDIR}/kernel-${CONFIG_VER}/kernel-x86_64-fedora.config" .config || die
+			cp "${WORKDIR}/fedora-kernel-config-${CONFIG_VER}/kernel-x86_64-fedora.config" .config || die
 			;;
 		*)
 			die "Unsupported arch ${ARCH}"

@@ -142,12 +142,38 @@ class TransformTests(unittest.TestCase):
         )
         self.assertIn('myversion="-t2gentoo-dist"', generated)
         self.assertIn('local extraversion=${PVR#${PATCH_PV}}', generated)
+        self.assertIn('cp amd64.config .config || die', generated)
         self.assertNotIn("REQUIRED_USE=", generated)
+
+    def test_transform_ebuild_preserves_legacy_and_new_fedora_config_paths(self):
+        legacy_upstream = UPSTREAM_EBUILD.replace(
+            "cp amd64.config .config || die",
+            'cp "${WORKDIR}/kernel-${CONFIG_VER}/kernel-x86_64-fedora.config" .config || die',
+        )
+        legacy_gen = update_kernel.transform_ebuild(legacy_upstream, VALID_SHA)
+        self.assertIn(
+            'cp "${WORKDIR}/kernel-${CONFIG_VER}/kernel-x86_64-fedora.config" .config || die',
+            legacy_gen,
+        )
+
+        new_upstream = UPSTREAM_EBUILD.replace(
+            "cp amd64.config .config || die",
+            'cp "${WORKDIR}/fedora-kernel-config-${CONFIG_VER}/kernel-x86_64-fedora.config" .config || die',
+        )
+        new_gen = update_kernel.transform_ebuild(new_upstream, VALID_SHA)
+        self.assertIn(
+            'cp "${WORKDIR}/fedora-kernel-config-${CONFIG_VER}/kernel-x86_64-fedora.config" .config || die',
+            new_gen,
+        )
 
     def test_transform_ebuild_fails_when_upstream_shape_changes(self):
         broken = UPSTREAM_EBUILD.replace('\teapply "${WORKDIR}/${PATCHSET}"\n', "")
         with self.assertRaises(update_kernel.UpdateError):
             update_kernel.transform_ebuild(broken, VALID_SHA)
+
+        no_amd64 = UPSTREAM_EBUILD.replace("cp amd64.config .config || die", "echo noop")
+        with self.assertRaises(update_kernel.UpdateError):
+            update_kernel.transform_ebuild(no_amd64, VALID_SHA)
 
     def test_transform_virtual_adds_t2_dependency(self):
         generated = update_kernel.transform_virtual(UPSTREAM_VIRTUAL)

@@ -15,7 +15,7 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stdout)],
 )
 
-DEFAULT_BRANCHES = ("6.12", "6.18", "7.0", "7.1")
+DEFAULT_BRANCHES = ("6.12", "6.18", "7.0", "7.1", "7.2")
 OVERLAY_DIR = os.environ.get("GITHUB_WORKSPACE") or os.getcwd()
 REQUEST_TIMEOUT = int(os.environ.get("UPDATE_KERNEL_REQUEST_TIMEOUT", "60"))
 GIT_TIMEOUT = int(os.environ.get("UPDATE_KERNEL_GIT_TIMEOUT", "60"))
@@ -228,14 +228,21 @@ def transform_ebuild(content, sha):
         "DESCRIPTION",
     )
 
-    replacement_case = """case ${ARCH} in
-\t\tamd64)
-\t\t\tcp "${WORKDIR}/kernel-${CONFIG_VER}/kernel-x86_64-fedora.config" .config || die
-\t\t\t;;
-\t\t*)
-\t\t\tdie "Unsupported arch ${ARCH}"
-\t\t\t;;
-\tesac"""
+    amd64_match = re.search(
+        r"amd64\)\s*\n(\s*cp\s+.*?\.config\s+\|\|\s+die)", content
+    )
+    if not amd64_match:
+        raise UpdateError("Could not find amd64 config copy command in upstream ebuild")
+    amd64_cp_cmd = amd64_match.group(1).strip()
+
+    replacement_case = f"""case ${{ARCH}} in
+\tamd64)
+\t\t{amd64_cp_cmd}
+\t\t;;
+\t*)
+\t\tdie "Unsupported arch ${{ARCH}}"
+\t\t;;
+esac"""
     content = replace_once(
         content,
         r"case \$\{ARCH\} in.*?esac",
