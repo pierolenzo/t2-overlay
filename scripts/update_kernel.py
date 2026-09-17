@@ -6,6 +6,8 @@ import os
 import re
 import subprocess
 import sys
+import time
+import urllib.error
 import urllib.request
 
 
@@ -19,6 +21,8 @@ DEFAULT_BRANCHES = ("6.12", "6.18", "7.0", "7.1", "7.2")
 OVERLAY_DIR = os.environ.get("GITHUB_WORKSPACE") or os.getcwd()
 REQUEST_TIMEOUT = int(os.environ.get("UPDATE_KERNEL_REQUEST_TIMEOUT", "60"))
 GIT_TIMEOUT = int(os.environ.get("UPDATE_KERNEL_GIT_TIMEOUT", "60"))
+HTTP_RETRIES = int(os.environ.get("UPDATE_KERNEL_HTTP_RETRIES", "3"))
+HTTP_RETRY_DELAY = float(os.environ.get("UPDATE_KERNEL_HTTP_RETRY_DELAY", "1"))
 
 _api_cache = {}
 _VERSION_RE = re.compile(r"^(?P<base>\d+(?:\.\d+)*(?:_p\d+)?)(?:-r(?P<revision>\d+))?$")
@@ -89,14 +93,44 @@ def require_contains(content, needle, description):
         raise UpdateError(f"Generated ebuild is missing {description}")
 
 
+def fetch_url(url):
+    req = urllib.request.Request(url)
+    last_error = None
+    for attempt in range(1, HTTP_RETRIES + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as response:
+                return response.read()
+        except urllib.error.HTTPError as exc:
+            last_error = exc
+            if exc.code < 500 or attempt == HTTP_RETRIES:
+                break
+        except urllib.error.URLError as exc:
+            last_error = exc
+            if attempt == HTTP_RETRIES:
+                break
+        except TimeoutError as exc:
+            last_error = exc
+            if attempt == HTTP_RETRIES:
+                break
+
+        logging.warning(
+            "Fetch attempt %d/%d failed for %s: %s",
+            attempt,
+            HTTP_RETRIES,
+            url,
+            last_error,
+        )
+        time.sleep(HTTP_RETRY_DELAY)
+
+    raise UpdateError(f"Error fetching {url}: {last_error}") from last_error
+
+
 def get_codeberg_dir_files(path):
     if path in _api_cache:
         return _api_cache[path]
     url = f"https://codeberg.org/api/v1/repos/gentoo/gentoo/contents/{path}?ref=master"
-    req = urllib.request.Request(url)
     try:
-        with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as response:
-            data = json.loads(response.read().decode("utf-8"))
+        data = json.loads(fetch_url(url).decode("utf-8"))
     except Exception as exc:
         raise UpdateError(f"Error fetching API {url}: {exc}") from exc
 
@@ -114,10 +148,8 @@ def get_codeberg_dir_files(path):
 
 def get_codeberg_raw_file(path, filename):
     url = f"https://codeberg.org/gentoo/gentoo/raw/branch/master/{path}/{filename}"
-    req = urllib.request.Request(url)
     try:
-        with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as response:
-            return response.read().decode("utf-8")
+        return fetch_url(url).decode("utf-8")
     except Exception as exc:
         raise UpdateError(f"Error downloading {url}: {exc}") from exc
 

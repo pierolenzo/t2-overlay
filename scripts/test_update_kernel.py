@@ -2,6 +2,7 @@
 import os
 import sys
 import tempfile
+import urllib.error
 import unittest
 import unittest.mock
 from pathlib import Path
@@ -290,6 +291,42 @@ class GetPatchBranchTests(unittest.TestCase):
         self.assertEqual(update_kernel.get_patch_branch("7.0"), "main")
         self.assertEqual(update_kernel.get_patch_branch("6.18"), "6.18")
         self.assertEqual(update_kernel.get_patch_branch("6.12"), "6.12")
+
+
+class FetchTests(unittest.TestCase):
+    @unittest.mock.patch("time.sleep")
+    @unittest.mock.patch("urllib.request.urlopen")
+    def test_get_codeberg_dir_files_retries_transient_5xx(self, mock_urlopen, _mock_sleep):
+        url = (
+            "https://codeberg.org/api/v1/repos/gentoo/gentoo/contents/"
+            "virtual/dist-kernel?ref=master"
+        )
+        transient = urllib.error.HTTPError(url, 504, "Gateway Time-out", {}, None)
+        success_response = unittest.mock.MagicMock()
+        success_response.__enter__.return_value.read.return_value = (
+            b'[{"name":"dist-kernel-6.12.1.ebuild"}]'
+        )
+        mock_urlopen.side_effect = [transient, success_response]
+
+        files = update_kernel.get_codeberg_dir_files("virtual/dist-kernel")
+        self.assertEqual(files, ["dist-kernel-6.12.1.ebuild"])
+        self.assertEqual(mock_urlopen.call_count, 2)
+
+    @unittest.mock.patch("time.sleep")
+    @unittest.mock.patch("urllib.request.urlopen")
+    def test_get_codeberg_dir_files_does_not_retry_client_error(
+        self, mock_urlopen, _mock_sleep
+    ):
+        url = (
+            "https://codeberg.org/api/v1/repos/gentoo/gentoo/contents/"
+            "virtual/dist-kernel?ref=master"
+        )
+        client_error = urllib.error.HTTPError(url, 404, "Not Found", {}, None)
+        mock_urlopen.side_effect = client_error
+
+        with self.assertRaises(update_kernel.UpdateError):
+            update_kernel.get_codeberg_dir_files("virtual/dist-kernel")
+        self.assertEqual(mock_urlopen.call_count, 1)
 
 
 if __name__ == "__main__":
