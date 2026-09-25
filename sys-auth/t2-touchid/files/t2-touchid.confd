@@ -1,0 +1,9 @@
+# /etc/conf.d/t2-touchid
+# Configuration for Apple T2 Touch ID bridge service
+# Settings are primarily configured in /etc/kait2en/t2-touchid.conf.
+# You can override or customize environment variables here if needed.
+
+# T2_TOUCHID_SOCKET="/run/t2-touchid/fprint.sock"
+# T2_TOUCHID_UID="auto"
+# T2_TOUCHID_FLAGS="0"
+# T2_TOUCHID_BIND_USER="none"

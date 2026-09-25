@@ -1,0 +1,9 @@
+[Match]
+Property=ID_USB_MODEL_ID=8233 ID_USB_VENDOR_ID=05ac
+MACAddress=ac:de:48:00:11:22
+
+[Network]
+Description=Apple T2 CDC-NCM internal bridge link
+LinkLocalAddressing=ipv6
+IPv6AcceptRA=no
+IPv4AddressingMode=disabled

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+	<maintainer type="project">
+		<email>auth@gentoo.org</email>
+	</maintainer>
+	<use>
+		<flag name="tod">Add support for Touch OEM Drivers</flag>
+		<flag name="virtual-drivers">Compile all drivers (-Ddrivers=all) including virtual drivers required by t2-touchid</flag>
+	</use>
+	<upstream>
+		<remote-id type="freedesktop-gitlab">libfprint/libfprint</remote-id>
+	</upstream>
+</pkgmetadata>

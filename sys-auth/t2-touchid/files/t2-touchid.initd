@@ -1,0 +1,27 @@
+#!/sbin/openrc-run
+# Copyright 2026 Gentoo Authors
+# Distributed under the terms of the GNU General Public License v2
+
+description="Apple T2 Touch ID bridge for fprintd"
+
+command="/usr/bin/t2-touchid"
+command_background="yes"
+pidfile="/run/t2-touchid/t2-touchid.pid"
+
+depend() {
+	need dbus
+	use net
+	before fprintd
+}
+
+start_pre() {
+	checkpath -d -m 0700 -o root:root /run/t2-touchid
+	if [ -f /etc/kait2en/t2-touchid.conf ]; then
+		# shellcheck source=/dev/null
+		. /etc/kait2en/t2-touchid.conf
+	fi
+	command_args="--socket ${T2_TOUCHID_SOCKET:-/run/t2-touchid/fprint.sock} --uid ${T2_TOUCHID_UID:-auto} --flags ${T2_TOUCHID_FLAGS:-0}"
+	if [ -n "${T2_TOUCHID_BIND_USER}" ] && [ "${T2_TOUCHID_BIND_USER}" != "none" ]; then
+		command_args="${command_args} --bind-user ${T2_TOUCHID_BIND_USER}"
+	fi
+}
