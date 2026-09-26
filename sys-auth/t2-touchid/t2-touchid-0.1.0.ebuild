@@ -169,6 +169,7 @@ pkg_pretend() {
 }
 
 pkg_setup() {
+	rust_pkg_setup
 	linux-info_pkg_setup
 }
 
