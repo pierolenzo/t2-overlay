@@ -111,7 +111,7 @@ DESCRIPTION="Bridges Apple T2 Touch ID sensor to fprintd via libfprint virtual d
 HOMEPAGE="https://github.com/kaiT2en/KaiT2en-Fedora"
 
 # Snapshot commit from kaiT2en-Fedora repository containing t2-touchid
-COMMIT="c8601fa80c1be1b4ffc70d4b4a621bebe3ff558e"
+COMMIT="c8601fac525c853eb38a296a321989880375b481"
 SRC_URI="
 	https://github.com/kaiT2en/KaiT2en-Fedora/archive/${COMMIT}.tar.gz -> ${P}.tar.gz
 	${CARGO_CRATE_URIS}
@@ -137,7 +137,6 @@ RDEPEND="
 "
 DEPEND=""
 BDEPEND="
-	virtual/rust
 	virtual/pkgconfig
 "
 

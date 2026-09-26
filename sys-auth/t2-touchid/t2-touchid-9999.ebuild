@@ -29,7 +29,6 @@ RDEPEND="
 "
 DEPEND=""
 BDEPEND="
-	virtual/rust
 	virtual/pkgconfig
 "
 
