@@ -127,7 +127,7 @@ REQUIRED_USE="?? ( elogind systemd )"
 
 RDEPEND="
 	sys-auth/fprintd
-	>=sys-auth/libfprint-1.94.0[virtual-drivers(+)]
+	>=sys-auth/libfprint-1.94.0
 	net-misc/iputils
 	sys-apps/iproute2
 	sys-apps/dbus
