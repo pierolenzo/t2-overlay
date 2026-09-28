@@ -45,7 +45,7 @@ pkg_pretend() {
 
 	if has_version sys-auth/libfprint; then
 		local libdir=$(get_libdir)
-		local so_files=( "${EROOT}"/usr/${libdir}/libfprint-2.so* )
+		local so_files=("${EROOT}"/usr/${libdir}/libfprint-2.so*)
 		if [[ -f "${so_files[0]}" ]]; then
 			if ! grep -q -a "FP_VIRTUAL_DEVICE_STORAGE" "${so_files[@]}" 2>/dev/null; then
 				ewarn "=========================================================================="
@@ -91,7 +91,7 @@ src_install() {
 	# Systemd service and fprintd drop-in
 	if use systemd; then
 		sed "s|@BINDIR@|${EPREFIX}/usr/bin|g" \
-			integration/systemd/kait2en-t2-touchid.service > "${T}/kait2en-t2-touchid.service" || die
+			integration/systemd/kait2en-t2-touchid.service >"${T}/kait2en-t2-touchid.service" || die
 		systemd_dounit "${T}/kait2en-t2-touchid.service"
 
 		insinto "$(systemd_get_systemunitdir)/fprintd.service.d"
@@ -125,33 +125,25 @@ pkg_postinst() {
 	elog "=========================================================================="
 	elog " Apple T2 Touch ID Bridge (t2-touchid) - Setup Instructions"
 	elog "=========================================================================="
-	elog "1. IMPORTANT: sys-auth/libfprint MUST be built with '-Ddrivers=all'!"
-	elog "   Gentoo's default libfprint excludes virtual storage device drivers."
-	elog "   To recompile libfprint with virtual drivers, add to /etc/portage/env/libfprint:"
-	elog "     myemesonargs=(\"-Ddrivers=all\")"
-	elog "   and map it in /etc/portage/package.env:"
-	elog "     sys-auth/libfprint libfprint"
-	elog "   then run: emerge --ask sys-auth/libfprint"
-	elog ""
-	elog "2. Kernel configuration:"
+	elog "1. Kernel configuration:"
 	elog "   Ensure CONFIG_USB_NET_CDC_NCM=y (or m) and CONFIG_IPV6=y are enabled."
 	elog ""
-	elog "3. Touch ID Enrollment in macOS:"
+	elog "2. Touch ID Enrollment in macOS:"
 	elog "   Enrol your fingerprints under macOS first! Also log into macOS once"
 	elog "   after cold boot to unlock the SEP biometric keybag."
 	elog ""
-	elog "4. Service Activation:"
+	elog "3. Service Activation:"
 	if use systemd; then
 		elog "   Systemd: systemctl enable --now kait2en-t2-touchid.service"
 	else
 		elog "   OpenRC:  rc-update add t2-touchid default && rc-service t2-touchid start"
 	fi
 	elog ""
-	elog "5. Binding to your Linux account:"
+	elog "4. Binding to your Linux account:"
 	elog "   Set T2_TOUCHID_BIND_USER=\"<username>\" in /etc/kait2en/t2-touchid.conf"
 	elog "   or run 'fprintd-enroll'."
 	elog ""
-	elog "6. Complementary PAM Authentication (Touch ID + Password):"
+	elog "5. Complementary PAM Authentication (Touch ID + Password):"
 	elog "   Enable Touch ID with password fallback for sudo using the included helper:"
 	elog "     # t2-touchid-pam --enable sudo"
 	elog "   Check status anytime with:"
