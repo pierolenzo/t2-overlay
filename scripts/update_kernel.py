@@ -487,21 +487,44 @@ def process_branch(branch, kernel_dir, virtual_dir):
         "branch": branch,
         "ebuild": os.path.basename(target_file),
         "sha": sha,
-        "details": get_patch_commit_details(sha),
+        "details": get_patch_commit_details(sha, base_sha=current_sha),
     }
 
 
-def get_patch_commit_details(sha):
-    """Fetch commit message details for the given linux-t2-patches commit."""
-    url = f"https://api.github.com/repos/pierolenzo/linux-t2-patches/commits/{sha}"
-    req = urllib.request.Request(url, headers={"User-Agent": "t2-overlay-updater"})
+def get_patch_commit_details(sha, base_sha=None):
+    """Fetch commit message details for the given linux-t2-patches commit dynamically.
+
+    If base_sha is provided, it retrieves all commits between base_sha and sha
+    via the GitHub Compare API so that no intermediate driver updates are lost.
+    """
+    headers = {"User-Agent": "t2-overlay-updater"}
     token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
     if token:
-        req.add_header("Authorization", f"Bearer {token}")
+        headers["Authorization"] = f"Bearer {token}"
+
+    # Try Compare API first if base_sha is available and different
+    if base_sha and base_sha != sha:
+        compare_url = f"https://api.github.com/repos/pierolenzo/linux-t2-patches/compare/{base_sha}...{sha}"
+        try:
+            req = urllib.request.Request(compare_url, headers=headers)
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                commits = data.get("commits", [])
+                if commits:
+                    messages = [c.get("commit", {}).get("message", "").strip() for c in commits]
+                    valid_messages = [m for m in messages if m]
+                    if valid_messages:
+                        return "\n\n---\n\n".join(valid_messages)
+        except Exception as exc:
+            logging.debug("Could not compare %s...%s via GitHub API: %s", base_sha, sha, exc)
+
+    # Fallback to single commit details
+    commit_url = f"https://api.github.com/repos/pierolenzo/linux-t2-patches/commits/{sha}"
     try:
+        req = urllib.request.Request(commit_url, headers=headers)
         with urllib.request.urlopen(req, timeout=10) as resp:
             data = json.loads(resp.read().decode("utf-8"))
-            return data.get("commit", {}).get("message", "")
+            return data.get("commit", {}).get("message", "").strip()
     except Exception as exc:
         logging.debug("Could not fetch commit details for %s from GitHub API: %s", sha, exc)
         return ""
