@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+	<maintainer type="person">
+		<email>piero@gentoo.local</email>
+		<name>Piero</name>
+	</maintainer>
+	<upstream>
+		<remote-id type="github">kaiT2en/KaiT2en-Fedora</remote-id>
+		<bugs-to>https://github.com/kaiT2en/KaiT2en-Fedora/issues</bugs-to>
+	</upstream>
+	<longdescription lang="en">
+		t2-journal (t2journal) retrieves Apple T2 bridgeOS unified logs over the
+		CDC-NCM USB link and merges them chronologically with Linux systemd journal boots.
+	</longdescription>
+</pkgmetadata>
