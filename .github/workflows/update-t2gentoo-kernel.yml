@@ -1,8 +1,6 @@
 name: Update t2gentoo-kernel
 
 on:
-  schedule:
-  - cron: "0 3 * * *"
   workflow_dispatch:
 
 permissions:
