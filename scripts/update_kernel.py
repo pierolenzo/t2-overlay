@@ -482,16 +482,49 @@ def process_branch(branch, kernel_dir, virtual_dir):
     subprocess.run(["ebuild", target_file, "manifest"], check=True, env=env)
     subprocess.run(["ebuild", virt_path, "manifest"], check=True, env=env)
 
-    return f"Update {branch}: {os.path.basename(target_file)} (t2-patch SHA: {sha[:8]})"
+    return {
+        "summary": f"Update {branch}: {os.path.basename(target_file)} (t2-patch SHA: {sha[:8]})",
+        "branch": branch,
+        "ebuild": os.path.basename(target_file),
+        "sha": sha,
+        "details": get_patch_commit_details(sha),
+    }
+
+
+def get_patch_commit_details(sha):
+    """Fetch commit message details for the given linux-t2-patches commit."""
+    url = f"https://api.github.com/repos/pierolenzo/linux-t2-patches/commits/{sha}"
+    req = urllib.request.Request(url, headers={"User-Agent": "t2-overlay-updater"})
+    token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+    if token:
+        req.add_header("Authorization", f"Bearer {token}")
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            return data.get("commit", {}).get("message", "")
+    except Exception as exc:
+        logging.debug("Could not fetch commit details for %s from GitHub API: %s", sha, exc)
+        return ""
 
 
 def write_commit_message(updates_made):
     with open(
         os.path.join(OVERLAY_DIR, "commit_message.txt"), "w", encoding="utf-8"
     ) as handle:
-        handle.write("Auto-update t2gentoo-kernel ebuilds\n\n")
+        handle.write("sys-kernel/t2gentoo-kernel: auto-update ebuilds and t2 patches\n\n")
         for update in updates_made:
-            handle.write(f"- {update}\n")
+            if isinstance(update, dict):
+                branch = update.get("branch", "")
+                ebuild = update.get("ebuild", "")
+                sha = update.get("sha", "")
+                details = update.get("details", "").strip()
+
+                handle.write(f"=== {ebuild} ({branch}) ===\n")
+                handle.write(f"Patch: https://github.com/pierolenzo/linux-t2-patches/commit/{sha}\n\n")
+                if details:
+                    handle.write(f"{details}\n\n")
+            else:
+                handle.write(f"- {update}\n")
     logging.info("Wrote commit_message.txt with update details.")
 
 
