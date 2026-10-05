@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=T2 Touch Bar
+Comment=Dark-first Touch Bar daemon for Apple T2 MacBooks
+Exec=/usr/bin/kait2en-touchbar
+Terminal=false
+Categories=Utility;HardwareSettings;
+X-GNOME-Autostart-enabled=true
+X-KDE-autostart-after=panel
+NoDisplay=true

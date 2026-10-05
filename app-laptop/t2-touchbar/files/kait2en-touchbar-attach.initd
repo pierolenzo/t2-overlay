@@ -1,0 +1,16 @@
+#!/sbin/openrc-run
+# Copyright 2026 Gentoo Authors
+# Distributed under the terms of the GNU General Public License v2
+
+description="Attach Apple T2 Touch Bar DRM display interface"
+
+depend() {
+	need udev
+	after udev-trigger
+}
+
+start() {
+	ebegin "Attaching Apple T2 Touch Bar display"
+	/usr/bin/kait2en-touchbar --attach
+	eend $?
+}

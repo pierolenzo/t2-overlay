@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+	<maintainer type="person">
+		<email>piero@gentoo.local</email>
+		<name>Piero</name>
+	</maintainer>
+	<upstream>
+		<remote-id type="github">kaiT2en/KaiT2en-Fedora</remote-id>
+		<bugs-to>https://github.com/kaiT2en/KaiT2en-Fedora/issues</bugs-to>
+	</upstream>
+	<longdescription lang="en">
+		t2-touchbar (kait2en-touchbar) is a dark-first Touch Bar daemon for Apple T2
+		MacBooks. It replaces Apple's built-in Touch Bar firmware row with a custom
+		DRM display interface, adaptive timeouts, media keys, F-keys, haptic feedback,
+		and Touch ID prompt integration.
+	</longdescription>
+</pkgmetadata>
