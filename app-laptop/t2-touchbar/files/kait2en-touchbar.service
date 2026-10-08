@@ -1,0 +1,35 @@
+[Unit]
+Description=T2 Touch Bar
+After=graphical-session.target
+PartOf=graphical-session.target
+StartLimitIntervalSec=30
+StartLimitBurst=5
+
+[Service]
+Type=simple
+ExecStartPre=/usr/bin/kait2en-touchbar --attach
+ExecStart=/usr/bin/kait2en-touchbar
+ExecStopPost=-/usr/bin/kait2en-touchbar --detach
+Restart=on-failure
+RestartSec=2
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=false
+PrivateTmp=true
+PrivateIPC=true
+ProtectKernelTunables=false
+ReadWritePaths=-/sys/bus/usb/devices
+ReadWritePaths=-/sys/devices
+ReadWritePaths=-/sys/class/backlight/t2tb_backlight/brightness
+ReadWritePaths=-/sys/class/backlight/appletb_backlight/brightness
+ReadWritePaths=-/sys/module/t2_trackpad_actuator/parameters/play
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_NETLINK
+RestrictNamespaces=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=graphical-session.target

@@ -233,10 +233,9 @@ src_install() {
 	# udev rule with standard Gentoo video and input groups
 	udev_dorules "${FILESDIR}/99-t2-touchbar.rules"
 
-	# systemd services (system attach and user session daemon)
+	# systemd user session daemon (autonomously manages display attach/detach)
 	if use systemd; then
-		systemd_dounit integration/systemd/system/kait2en-touchbar-attach.service
-		systemd_douserunit integration/systemd/user/kait2en-touchbar.service
+		systemd_douserunit "${FILESDIR}/kait2en-touchbar.service"
 	fi
 
 	# OpenRC attach service
@@ -258,27 +257,28 @@ pkg_postinst() {
 	elog ""
 	elog " [Permissions & System Groups]"
 	elog " Device nodes are governed by standard Gentoo system groups:"
-	elog "   - 'video': grants access to Touch Bar DRM display and backlight"
+	elog "   - 'video': grants access to Touch Bar DRM display, backlight and USB attach"
 	elog "   - 'input': grants access to touch digitizer, Fn key and /dev/uinput"
 	elog ""
 	elog " Ensure your desktop user is a member of the 'video' and 'input' groups:"
 	elog "   # usermod -aG video,input <username>"
 	elog ""
-	elog " [Hardware Initialization (USB attach switch)]"
-	elog " To switch the panel from the firmware row to the DRM display:"
+	elog " [User Session Daemon & Autostart]"
+	elog " Touch Bar initialization (attach) and panel control are now fully"
+	elog " managed in user session. Start and enable the daemon with:"
+	elog ""
 	if use systemd; then
-		elog "   # systemctl enable --now kait2en-touchbar-attach.service"
+		elog "   $ systemctl --user enable --now kait2en-touchbar.service"
 	else
 		elog "   # rc-update add kait2en-touchbar-attach default"
 		elog "   # rc-service kait2en-touchbar-attach start"
 	fi
-	elog ""
-	elog " [User Session Daemon]"
-	if use systemd; then
-		elog "   $ systemctl --user enable --now kait2en-touchbar.service"
-	fi
 	elog "   The daemon is also configured to auto-start via XDG autostart"
 	elog "   (/etc/xdg/autostart/kait2en-touchbar.desktop) upon graphical login."
+	elog ""
+	elog " [Firmware Fallback Mode]"
+	elog " When the user daemon is stopped, the Touch Bar automatically remains in"
+	elog " native firmware mode (ESC/F-keys/brightness/volume) on seat0."
 	elog "=========================================================================="
 }
 
