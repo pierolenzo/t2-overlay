@@ -1,0 +1,51 @@
+--- a/src/display.rs
++++ b/src/display.rs
+@@ -64,7 +64,16 @@ fn property_id<T: ResourceHandle>(card: &Card, handle: T, name: &str) -> Result<
+ }
+ 
+ fn try_open(path: &Path) -> Result<Display> {
+-    let card = Card::open(path)?;
++    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
++    let card = loop {
++        match Card::open(path) {
++            Ok(card) => break card,
++            Err(_err) if std::time::Instant::now() < deadline => {
++                std::thread::sleep(std::time::Duration::from_millis(50));
++            }
++            Err(err) => return Err(err),
++        }
++    };
+     card.set_client_capability(ClientCapability::UniversalPlanes, true)?;
+     card.set_client_capability(ClientCapability::Atomic, true)?;
+     card.acquire_master_lock()?;
+--- a/src/usb.rs
++++ b/src/usb.rs
+@@ -37,8 +37,10 @@ pub fn touchbar_drm_card() -> Option<PathBuf> {
+ }
+ 
+ pub fn ensure_display_configuration() -> Result<()> {
+-    if touchbar_drm_card().is_some() {
+-        return Ok(());
++    if let Some(card) = touchbar_drm_card() {
++        if OpenOptions::new().read(true).write(true).open(&card).is_ok() {
++            return Ok(());
++        }
+     }
+     let deadline = Instant::now() + ATTACH_TIMEOUT;
+     let mut next_reprobe = Instant::now();
+@@ -60,7 +62,14 @@ pub fn ensure_display_configuration() -> Result<()> {
+             next_reprobe = Instant::now() + Duration::from_secs(2);
+         }
+ 
+-        if touchbar_drm_card().is_some() {
++        if let Some(card) = touchbar_drm_card() {
++            let ready_deadline = Instant::now() + Duration::from_secs(3);
++            while Instant::now() < ready_deadline {
++                if OpenOptions::new().read(true).write(true).open(&card).is_ok() {
++                    return Ok(());
++                }
++                thread::sleep(Duration::from_millis(50));
++            }
+             return Ok(());
+         }
+         if Instant::now() >= deadline {

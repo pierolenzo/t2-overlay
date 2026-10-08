@@ -8,3 +8,4 @@ Categories=Utility;HardwareSettings;
 X-GNOME-Autostart-enabled=true
 X-KDE-autostart-after=panel
 NoDisplay=true
+X-systemd-skip=true

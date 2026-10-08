@@ -57,6 +57,10 @@ src_unpack() {
 	cargo_live_src_unpack
 }
 
+PATCHES=(
+	"${FILESDIR}/0001-wait-for-drm-device-readiness.patch"
+)
+
 src_prepare() {
 	default
 

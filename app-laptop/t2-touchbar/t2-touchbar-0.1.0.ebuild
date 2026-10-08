@@ -202,6 +202,10 @@ pkg_setup() {
 	linux-info_pkg_setup
 }
 
+PATCHES=(
+	"${FILESDIR}/0001-wait-for-drm-device-readiness.patch"
+)
+
 src_prepare() {
 	default
 

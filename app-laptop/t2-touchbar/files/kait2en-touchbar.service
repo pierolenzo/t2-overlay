@@ -8,6 +8,7 @@ StartLimitBurst=5
 [Service]
 Type=simple
 ExecStartPre=/usr/bin/kait2en-touchbar --attach
+ExecStartPre=-/usr/bin/udevadm settle -t 5
 ExecStart=/usr/bin/kait2en-touchbar
 ExecStopPost=-/usr/bin/kait2en-touchbar --detach
 Restart=on-failure
