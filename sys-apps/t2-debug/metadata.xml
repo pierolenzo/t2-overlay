@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+	<maintainer type="person">
+		<email>piero@gentoo.local</email>
+		<name>Piero</name>
+	</maintainer>
+	<upstream>
+		<remote-id type="github">kaiT2en/KaiT2en-Fedora</remote-id>
+		<bugs-to>https://github.com/kaiT2en/KaiT2en-Fedora/issues</bugs-to>
+	</upstream>
+	<use>
+		<flag name="gui">Enable the GTK4 / Libadwaita graphical interface</flag>
+	</use>
+	<longdescription lang="en">
+		t2-debug is a live Apple T2 (bridgeOS) debugger that interfaces over
+		the Instruments dtservicehub via CDC-NCM USB link, featuring a live process
+		top viewer and os_log stream viewer with both CLI (t2debug) and GTK4/Libadwaita GUI.
+	</longdescription>
+</pkgmetadata>
