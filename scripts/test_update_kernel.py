@@ -329,5 +329,46 @@ class FetchTests(unittest.TestCase):
         self.assertEqual(mock_urlopen.call_count, 1)
 
 
+class PatchVersionValidationTests(unittest.TestCase):
+    def test_parse_kver_variants(self):
+        self.assertEqual(update_kernel.parse_kver("KVER=7.2.10\n"), "7.2")
+        self.assertEqual(update_kernel.parse_kver("KVER=7.3"), "7.3")
+        self.assertEqual(update_kernel.parse_kver("KVER=7.3-rc7\n"), "7.3")
+        self.assertEqual(update_kernel.parse_kver("KVER = 6.18.56"), "6.18")
+        self.assertEqual(update_kernel.parse_kver("7.2.5\n"), "7.2")
+
+    def test_parse_kver_invalid(self):
+        with self.assertRaises(update_kernel.UpdateError):
+            update_kernel.parse_kver("invalid_string_without_version")
+
+    @unittest.mock.patch("update_kernel.get_t2_patch_kver")
+    def test_validate_patch_version_success(self, mock_get_kver):
+        mock_get_kver.return_value = "7.2"
+        # Should not raise
+        update_kernel.validate_patch_version("7.2", VALID_SHA)
+        mock_get_kver.assert_called_once_with(VALID_SHA)
+
+    @unittest.mock.patch("update_kernel.get_t2_patch_kver")
+    def test_validate_patch_version_mismatch(self, mock_get_kver):
+        mock_get_kver.return_value = "7.3"
+        with self.assertRaises(update_kernel.UpdateError) as ctx:
+            update_kernel.validate_patch_version("7.2", VALID_SHA)
+        self.assertIn("Version mismatch for branch '7.2'", str(ctx.exception))
+        self.assertIn("targets kernel 7.3, not 7.2", str(ctx.exception))
+
+    @unittest.mock.patch("update_kernel.validate_patch_version")
+    @unittest.mock.patch("update_kernel.get_latest_t2_sha")
+    def test_process_branch_validates_version_before_ebuild_generation(
+        self, mock_get_sha, mock_validate
+    ):
+        mock_get_sha.return_value = VALID_SHA
+        mock_validate.side_effect = update_kernel.UpdateError("Mismatch aborted")
+
+        with self.assertRaises(update_kernel.UpdateError):
+            update_kernel.process_branch("7.2", "/fake/dir", "/fake/virt")
+
+        mock_validate.assert_called_once_with("7.2", VALID_SHA)
+
+
 if __name__ == "__main__":
     unittest.main()

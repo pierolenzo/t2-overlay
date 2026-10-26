@@ -93,8 +93,14 @@ def require_contains(content, needle, description):
         raise UpdateError(f"Generated ebuild is missing {description}")
 
 
-def fetch_url(url):
-    req = urllib.request.Request(url)
+def fetch_url(url, headers=None):
+    req_headers = {"User-Agent": "t2-overlay-updater"}
+    if headers:
+        req_headers.update(headers)
+    token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+    if token and ("github.com" in url or "githubusercontent.com" in url):
+        req_headers.setdefault("Authorization", f"Bearer {token}")
+    req = urllib.request.Request(url, headers=req_headers)
     last_error = None
     for attempt in range(1, HTTP_RETRIES + 1):
         try:
@@ -196,6 +202,42 @@ def get_latest_t2_sha(branch):
     if not out.strip():
         raise UpdateError(f"No t2linux branch found for {git_branch}")
     return out.split()[0]
+
+
+def parse_kver(version_content):
+    match = re.search(r"(?:KVER\s*=\s*)?([0-9]+(?:\.[0-9]+)+)", version_content.strip())
+    if not match:
+        raise UpdateError(f"Could not parse kernel version from version file: {version_content!r}")
+    kver = match.group(1)
+    parts = kver.split(".")
+    if len(parts) >= 2:
+        return f"{parts[0]}.{parts[1]}"
+    return kver
+
+
+def get_t2_patch_kver(sha):
+    url = f"https://raw.githubusercontent.com/pierolenzo/linux-t2-patches/{sha}/version"
+    try:
+        content = fetch_url(url).decode("utf-8")
+        return parse_kver(content)
+    except Exception as exc:
+        raise UpdateError(f"Could not fetch or parse version file for patch {sha}: {exc}") from exc
+
+
+def validate_patch_version(branch, sha):
+    patch_kver = get_t2_patch_kver(sha)
+    if patch_kver != branch:
+        raise UpdateError(
+            f"Version mismatch for branch '{branch}': patch commit {sha[:8]} targets "
+            f"kernel {patch_kver}, not {branch}. Please check KERNEL_PATCH_BRANCH_MAP "
+            f"or the patch branch on GitHub."
+        )
+    logging.info(
+        "Validated patch commit %s targets matching kernel %s for branch %s",
+        sha[:8],
+        patch_kver,
+        branch,
+    )
 
 
 def get_highest_branch_ebuild(files, package, branch):
@@ -440,6 +482,7 @@ def find_upstream_virtual(virt_files, branch, upstream_version):
 def process_branch(branch, kernel_dir, virtual_dir):
     logging.info("Processing branch %s", branch)
     sha = get_latest_t2_sha(branch)
+    validate_patch_version(branch, sha)
 
     upstream_ebuild = get_highest_gentoo_version(branch)
     if not upstream_ebuild:
