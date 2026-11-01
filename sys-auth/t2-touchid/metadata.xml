@@ -6,7 +6,7 @@
 		<name>Piero</name>
 	</maintainer>
 	<use>
-		<flag name="networkmanager">Install NetworkManager connection profile for the Apple T2 CDC-NCM link</flag>
+		<flag name="networkmanager">Configure NetworkManager to leave the Apple T2 CDC-NCM link unmanaged</flag>
 	</use>
 	<upstream>
 		<remote-id type="github">kaiT2en/KaiT2en-Fedora</remote-id>

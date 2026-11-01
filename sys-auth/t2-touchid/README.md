@@ -131,24 +131,24 @@ Portage will resolve dependencies and rebuild `sys-auth/libfprint` with virtual 
 
 ## 5. Apple T2 Network Configuration (CDC-NCM)
 
-The internal CDC-NCM link must be up and assigned an IPv6 link-local address (`fe80:...`).
+The internal CDC-NCM link (`05ac:8233`, MAC `AC:DE:48:00:11:22`) must be up and assigned an IPv6 link-local address (`fe80:...`).
+
+* **udev rule (Default on all inits):**
+  The package installs `/usr/lib/udev/rules.d/90-t2-services-ncm.rules`, which brings the interface up automatically with EUI64 link-local IPv6 whenever the T2 USB CDC-NCM device is detected.
 
 * **With NetworkManager:**
-  When built with `USE="networkmanager"`, the ebuild installs `/etc/NetworkManager/system-connections/t2-ncm.nmconnection`. Reload NetworkManager:
+  When built with `USE="networkmanager"`, `/etc/NetworkManager/conf.d/10-t2-services.conf` is installed to instruct NetworkManager to leave the T2 CDC-NCM link unmanaged (`unmanaged-devices=mac:ac:de:48:00:11:22`). This prevents NetworkManager from tearing the interface down before system suspend hooks can safely terminate T2 sessions. If you have an older `/etc/NetworkManager/system-connections/t2-ncm.nmconnection` profile, remove it:
   ```bash
+  rm /etc/NetworkManager/system-connections/t2-ncm.nmconnection
   nmcli connection reload
-  nmcli connection up "Apple T2 Bridge"
   ```
 
 * **With systemd-networkd:**
-  The ebuild installs `10-t2-ncm.network` into `/usr/lib/systemd/network/10-t2-ncm.network`.
+  The ebuild also provides `10-t2-ncm.network` in `/usr/lib/systemd/network/10-t2-ncm.network` for setups using `systemd-networkd`.
   Restart `systemd-networkd`:
   ```bash
   systemctl restart systemd-networkd
   ```
-
-* **With OpenRC / netifrc:**
-  Ensure the CDC-NCM interface (identifiable by MAC address `AC:DE:48:00:11:22` or driver `cdc_ncm`) is brought up (`ip link set <interface> up`). The Linux kernel will automatically generate a link-local IPv6 address (`fe80::...`).
 
 ---
 

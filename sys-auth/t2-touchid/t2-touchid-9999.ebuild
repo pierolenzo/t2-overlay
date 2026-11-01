@@ -3,7 +3,7 @@
 
 EAPI=8
 
-inherit cargo linux-info multilib git-r3 systemd
+inherit cargo linux-info multilib git-r3 systemd udev
 
 DESCRIPTION="Bridges Apple T2 Touch ID sensor to fprintd via libfprint virtual device (live version)"
 HOMEPAGE="https://github.com/kaiT2en/KaiT2en-Fedora"
@@ -103,14 +103,18 @@ src_install() {
 	newinitd "${FILESDIR}/t2-touchid.initd" t2-touchid
 	newconfd "${FILESDIR}/t2-touchid.confd" t2-touchid
 
-	# Network profiles for Apple T2 CDC-NCM link
+	# Network configuration for Apple T2 CDC-NCM link
 	local shared_dir="${S}/../shared"
+
+	# CDC-NCM link is brought up via udev rule with link-local IPv6
+	sed -e "s|/usr/sbin/ip|${EPREFIX}/bin/ip|g" \
+		"${shared_dir}/integration/udev/90-t2-services-ncm.rules" > "${T}/90-t2-services-ncm.rules" || die
+	udev_dorules "${T}/90-t2-services-ncm.rules"
+
+	# Keep NetworkManager from managing the CDC-NCM link so suspend hooks work
 	if use networkmanager; then
 		insinto /etc/NetworkManager/conf.d
 		doins "${shared_dir}/integration/NetworkManager/10-t2-services.conf"
-		insinto /etc/NetworkManager/system-connections
-		doins "${shared_dir}/integration/NetworkManager/t2-ncm.nmconnection"
-		fperms 0600 /etc/NetworkManager/system-connections/t2-ncm.nmconnection
 	elif use systemd; then
 		insinto /usr/lib/systemd/network
 		doins "${FILESDIR}/10-t2-ncm.network"
@@ -123,6 +127,8 @@ src_install() {
 }
 
 pkg_postinst() {
+	udev_reload
+
 	elog "=========================================================================="
 	elog " Apple T2 Touch ID Bridge (t2-touchid) - Setup Instructions"
 	elog "=========================================================================="
@@ -150,4 +156,21 @@ pkg_postinst() {
 	elog "   Check status anytime with:"
 	elog "     # t2-touchid-pam --status sudo"
 	elog "=========================================================================="
+
+	if use networkmanager; then
+		if [[ -f "${EROOT}/etc/NetworkManager/system-connections/t2-ncm.nmconnection" ]]; then
+			elog ""
+			elog "NOTE: Legacy NetworkManager profile detected at:"
+			elog "  /etc/NetworkManager/system-connections/t2-ncm.nmconnection"
+			elog "Upstream now leaves the T2 CDC-NCM link unmanaged by NetworkManager"
+			elog "and manages it via udev (/usr/lib/udev/rules.d/90-t2-services-ncm.rules)."
+			elog "Please remove the obsolete profile to avoid conflicts:"
+			elog "  # rm /etc/NetworkManager/system-connections/t2-ncm.nmconnection"
+			elog "  # nmcli connection reload"
+		fi
+	fi
+}
+
+pkg_postrm() {
+	udev_reload
 }
