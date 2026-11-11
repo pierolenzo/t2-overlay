@@ -68,6 +68,10 @@ src_prepare() {
 	sed -i 's|/usr/local/bin|/usr/bin|g' \
 		org.t2truetone.gtk.desktop \
 		systemd/t2-truetone.service || die
+
+	# Grant video group access to T2 ambient light sensor for Gentoo desktop sessions
+	sed -i 's|TAG+="uaccess"|TAG+="uaccess", GROUP="video", MODE="0660"|g' \
+		udev/70-t2-truetone.rules || die
 }
 
 src_compile() {
@@ -108,6 +112,7 @@ src_install() {
 
 pkg_postinst() {
 	udev_reload
+	udevadm trigger --action=change --subsystem-match=hidraw 2>/dev/null || true
 	if use gui; then
 		xdg_icon_cache_reload
 		xdg_desktop_database_update
