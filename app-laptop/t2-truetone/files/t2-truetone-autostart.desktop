@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=T2 TrueTone Daemon
+Comment=Apple T2 TrueTone and autobrightness user daemon
+Exec=/usr/bin/t2truetone daemon
+Terminal=false
+NoDisplay=true
+OnlyShowIn=GNOME;
+X-GNOME-Autostart-enabled=true
