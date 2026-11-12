@@ -1,0 +1,950 @@
+diff --git a/build.rs b/build.rs
+new file mode 100644
+index 0000000..596446a
+--- /dev/null
++++ b/build.rs
+@@ -0,0 +1,37 @@
++use std::process::Command;
++
++fn main() {
++    println!("cargo:rustc-link-lib=wayland-client");
++    let out_dir = std::env::var("OUT_DIR").unwrap();
++    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
++
++    let c1 = format!("{manifest_dir}/src/wlr-gamma-client-protocol.c");
++    let c2 = format!("{manifest_dir}/src/wlr_gamma.c");
++    let o1 = format!("{out_dir}/wlr-gamma-client-protocol.o");
++    let o2 = format!("{out_dir}/wlr_gamma.o");
++    let lib = format!("{out_dir}/libwlr_gamma.a");
++
++    let cc = std::env::var("CC").unwrap_or_else(|_| "cc".into());
++    let ar = std::env::var("AR").unwrap_or_else(|_| "ar".into());
++
++    let status1 = Command::new(&cc)
++        .args(["-c", "-fPIC", "-O2", &format!("-I{manifest_dir}/src"), &c1, "-o", &o1])
++        .status()
++        .expect("cc failed compiling protocol");
++    let status2 = Command::new(&cc)
++        .args(["-c", "-fPIC", "-O2", &format!("-I{manifest_dir}/src"), &c2, "-o", &o2])
++        .status()
++        .expect("cc failed compiling wlr_gamma");
++    assert!(status1.success() && status2.success());
++
++    let status_ar = Command::new(&ar)
++        .args(["crus", &lib, &o1, &o2])
++        .status()
++        .expect("ar failed creating static library");
++    assert!(status_ar.success());
++
++    println!("cargo:rustc-link-search=native={out_dir}");
++    println!("cargo:rustc-link-lib=static=wlr_gamma");
++    println!("cargo:rerun-if-changed=src/wlr_gamma.c");
++    println!("cargo:rerun-if-changed=src/wlr-gamma-client-protocol.c");
++}
+diff --git a/src/autobright/backlight.rs b/src/autobright/backlight.rs
+index 3471621..fd7a05e 100644
+--- a/src/autobright/backlight.rs
++++ b/src/autobright/backlight.rs
+@@ -29,30 +29,67 @@ fn proxy(connection: &Connection) -> Result<Proxy<'_>> {
+         .build()?)
+ }
+ 
+-/// `None` when mutter controls no backlight, as on a desktop Mac.
++/// `None` when neither mutter nor sysfs controls a backlight.
+ pub fn read(connection: &Connection) -> Result<Option<Backlight>> {
+-    let (serial, outputs): (u32, Vec<HashMap<String, OwnedValue>>) =
+-        proxy(connection)?.get_property("Backlight").context("reading mutter Backlight")?;
+-    let backlights: Vec<Backlight> = outputs
+-        .into_iter()
+-        .filter(|output| output.get("active").and_then(|v| bool::try_from(v).ok()).unwrap_or(false))
+-        .filter_map(|output| {
+-            let int = |key: &str| output.get(key).and_then(|v| i32::try_from(v).ok());
+-            Some(Backlight {
+-                serial,
+-                connector: output.get("connector").and_then(|v| v.try_clone().ok()).and_then(|v| String::try_from(v).ok())?,
+-                min: int("min")?,
+-                max: int("max")?,
+-            })
+-        })
+-        .collect();
+-    let builtin = backlights.iter().position(|backlight| backlight.connector.starts_with("eDP")).unwrap_or(0);
+-    Ok(backlights.into_iter().nth(builtin))
++    if let Ok(p) = proxy(connection) {
++        if let Ok((serial, outputs)) = p.get_property::<(u32, Vec<HashMap<String, OwnedValue>>)>("Backlight") {
++            let backlights: Vec<Backlight> = outputs
++                .into_iter()
++                .filter(|output| output.get("active").and_then(|v| bool::try_from(v).ok()).unwrap_or(false))
++                .filter_map(|output| {
++                    let int = |key: &str| output.get(key).and_then(|v| i32::try_from(v).ok());
++                    Some(Backlight {
++                        serial,
++                        connector: output.get("connector").and_then(|v| v.try_clone().ok()).and_then(|v| String::try_from(v).ok())?,
++                        min: int("min")?,
++                        max: int("max")?,
++                    })
++                })
++                .collect();
++            let builtin = backlights.iter().position(|backlight| backlight.connector.starts_with("eDP")).unwrap_or(0);
++            if let Some(b) = backlights.into_iter().nth(builtin) {
++                return Ok(Some(b));
++            }
++        }
++    }
++
++    // Fallback: sysfs direct for non-GNOME / Sway
++    if let Ok(entries) = std::fs::read_dir("/sys/class/backlight") {
++        for entry in entries.flatten() {
++            let path = entry.path();
++            let name = path.file_name().unwrap_or_default().to_string_lossy();
++            if name.contains("appletb") || name.contains("touchbar") {
++                continue;
++            }
++            let max = std::fs::read_to_string(path.join("max_brightness"))
++                .ok()
++                .and_then(|s| s.trim().parse::<i32>().ok());
++            if let Some(max) = max {
++                return Ok(Some(Backlight {
++                    serial: 0,
++                    connector: name.to_string(),
++                    min: 0,
++                    max,
++                }));
++            }
++        }
++    }
++
++    Ok(None)
+ }
+ 
+ pub fn set(connection: &Connection, backlight: &Backlight, value: i32) -> Result<()> {
+-    proxy(connection)?
+-        .call_method("SetBacklight", &(backlight.serial, backlight.connector.as_str(), value))
+-        .context("mutter SetBacklight")?;
++    if backlight.serial != 0 {
++        if let Ok(p) = proxy(connection) {
++            if p.call_method("SetBacklight", &(backlight.serial, backlight.connector.as_str(), value)).is_ok() {
++                return Ok(());
++            }
++        }
++    }
++
++    // Direct sysfs write (works when user is in 'video' group)
++    let path = format!("/sys/class/backlight/{}/brightness", backlight.connector);
++    std::fs::write(&path, format!("{value}\n"))
++        .with_context(|| format!("writing brightness to {path}"))?;
+     Ok(())
+ }
+diff --git a/src/autobright/mod.rs b/src/autobright/mod.rs
+index 3e815de..fdbf79c 100644
+--- a/src/autobright/mod.rs
++++ b/src/autobright/mod.rs
+@@ -57,7 +57,11 @@ impl<'a> Panel<'a> {
+         let device = fs::read_dir("/sys/class/backlight")
+             .context("reading /sys/class/backlight")?
+             .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+-            .find(|device| read(&device.join("max_brightness")) == Some(backlight.max))
++            .find(|device| {
++                let name = device.file_name().unwrap_or_default().to_string_lossy();
++                (name == backlight.connector || read(&device.join("max_brightness")) == Some(backlight.max))
++                    && !name.contains("appletb")
++            })
+             .ok_or_else(|| anyhow!("no backlight device with max {}", backlight.max))?;
+         Ok(Panel { connection, backlight, actual: device.join("actual_brightness") })
+     }
+diff --git a/src/daemon.rs b/src/daemon.rs
+index 0ffd142..a4883e3 100644
+--- a/src/daemon.rs
++++ b/src/daemon.rs
+@@ -15,6 +15,7 @@ use crate::gamma::{self, Base, LUT_LEN};
+ use crate::gnome;
+ use crate::model::{self, Locus, Vec3};
+ use crate::mutter::{Mutter, Panel};
++use crate::wlr::WlrGamma;
+ use crate::night;
+ use crate::status::{self, Status};
+ 
+@@ -28,9 +29,13 @@ extern "C" fn on_signal(_: libc::c_int) {
+     STOP.store(true, Ordering::SeqCst);
+ }
+ 
++enum Backend {
++    Mutter(Mutter, Panel),
++    Wlr(WlrGamma),
++}
++
+ struct Output {
+-    mutter: Mutter,
+-    panel: Panel,
++    backend: Backend,
+     base: Base,
+     sent: Option<[f64; 3]>,
+     checked: Instant,
+@@ -38,33 +43,57 @@ struct Output {
+ 
+ impl Output {
+     fn open() -> Result<Self> {
+-        let mutter = Mutter::connect()?;
+-        let panel = mutter.panel()?;
+-        let cur = mutter.get_gamma(&panel)?;
+-        let base = if cur[0].len() != LUT_LEN {
+-            let b = gamma::base_from(&cur);
+-            gamma::save_base(&b);
+-            b
+-        } else {
+-            gamma::load_base().unwrap_or_else(gamma::identity)
+-        };
+-        Ok(Output { mutter, panel, base, sent: None, checked: Instant::now() })
++        if let Ok(mutter) = Mutter::connect() {
++            if let Ok(panel) = mutter.panel() {
++                let base = if let Ok(cur) = mutter.get_gamma(&panel) {
++                    if cur[0].len() != LUT_LEN {
++                        let b = gamma::base_from(&cur);
++                        gamma::save_base(&b);
++                        b
++                    } else {
++                        gamma::load_base().unwrap_or_else(gamma::identity)
++                    }
++                } else {
++                    gamma::load_base().unwrap_or_else(gamma::identity)
++                };
++                return Ok(Output {
++                    backend: Backend::Mutter(mutter, panel),
++                    base,
++                    sent: None,
++                    checked: Instant::now(),
++                });
++            }
++        }
++
++        let wlr = WlrGamma::connect()?;
++        let base = gamma::load_base().unwrap_or_else(gamma::identity);
++        Ok(Output {
++            backend: Backend::Wlr(wlr),
++            base,
++            sent: None,
++            checked: Instant::now(),
++        })
+     }
+ 
+     /// Re-read the panel and detect a LUT that mutter rewrote on its own.
+     fn check(&mut self) -> Result<()> {
+         self.checked = Instant::now();
+-        let panel = self.mutter.panel()?;
+-        if panel.serial != self.panel.serial || panel.crtc != self.panel.crtc {
+-            self.panel = panel;
+-            self.sent = None;
+-        }
+-        let len = self.mutter.gamma_len(&self.panel)?;
+-        if len != LUT_LEN {
+-            let cur = self.mutter.get_gamma(&self.panel)?;
+-            self.base = gamma::base_from(&cur);
+-            gamma::save_base(&self.base);
+-            self.sent = None;
++        match &mut self.backend {
++            Backend::Mutter(mutter, panel) => {
++                let p = mutter.panel()?;
++                if p.serial != panel.serial || p.crtc != panel.crtc {
++                    *panel = p;
++                    self.sent = None;
++                }
++                let len = mutter.gamma_len(panel)?;
++                if len != LUT_LEN {
++                    let cur = mutter.get_gamma(panel)?;
++                    self.base = gamma::base_from(&cur);
++                    gamma::save_base(&self.base);
++                    self.sent = None;
++                }
++            }
++            Backend::Wlr(_) => {}
+         }
+         Ok(())
+     }
+@@ -75,7 +104,11 @@ impl Output {
+                 return Ok(());
+             }
+         }
+-        self.mutter.set_gamma(&self.panel, &gamma::build(&self.base, gains))?;
++        let lut = gamma::build(&self.base, gains);
++        match &mut self.backend {
++            Backend::Mutter(mutter, panel) => mutter.set_gamma(panel, &lut)?,
++            Backend::Wlr(wlr) => wlr.set_gamma(&lut)?,
++        }
+         self.sent = Some(gains);
+         Ok(())
+     }
+@@ -87,7 +120,12 @@ impl Output {
+             let t = i as f64 / 15.0;
+             let k = t * t * (3.0 - 2.0 * t);
+             let g = [0, 1, 2].map(|c| from[c] + (1.0 - from[c]) * k);
+-            if let Err(e) = self.mutter.set_gamma(&self.panel, &gamma::build(&self.base, g)) {
++            let lut = gamma::build(&self.base, g);
++            let res = match &mut self.backend {
++                Backend::Mutter(mutter, panel) => mutter.set_gamma(panel, &lut),
++                Backend::Wlr(wlr) => wlr.set_gamma(&lut),
++            };
++            if let Err(e) = res {
+                 eprintln!("t2-truetone: could not restore the panel LUT: {e:#}");
+                 return;
+             }
+diff --git a/src/gnome.rs b/src/gnome.rs
+index 550f0ca..10e9c54 100644
+--- a/src/gnome.rs
++++ b/src/gnome.rs
+@@ -38,9 +38,17 @@ fn log(msg: &str) {
+     eprintln!("t2-truetone: {msg}");
+ }
+ 
++fn is_gnome() -> bool {
++    std::env::var_os("GNOME_SETUP_DISPLAY").is_some()
++        || std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_default().to_lowercase().contains("gnome")
++}
++
+ /// Take the GNOME feature over: remember its value once, then turn it off.
+ /// Nothing is changed unless the original value is safely on disk.
+ pub fn take_over(key: (&str, &str)) {
++    if !is_gnome() {
++        return;
++    }
+     let Some(p) = saved_path(key) else {
+         return log("no state directory, leaving GNOME settings alone");
+     };
+@@ -63,6 +71,9 @@ pub fn take_over(key: (&str, &str)) {
+ 
+ /// Give the GNOME feature back with the value it had before.
+ pub fn give_back(key: (&str, &str)) {
++    if !is_gnome() {
++        return;
++    }
+     let Some(p) = saved_path(key) else { return };
+     let Ok(v) = fs::read_to_string(&p) else { return };
+     if !set(key, v.trim() == "true") {
+diff --git a/src/lib.rs b/src/lib.rs
+index 25859e1..3b0667d 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -12,5 +12,6 @@ pub mod model;
+ pub mod mutter;
+ pub mod night;
+ pub mod status;
++pub mod wlr;
+ 
+ pub const SERVICE: &str = "t2-truetone.service";
+diff --git a/src/wlr-gamma-client-protocol.c b/src/wlr-gamma-client-protocol.c
+new file mode 100644
+index 0000000..1ffbeec
+--- /dev/null
++++ b/src/wlr-gamma-client-protocol.c
+@@ -0,0 +1,79 @@
++/* Generated by wayland-scanner 1.26.0 */
++
++/*
++ * Copyright © 2015 Giulio camuffo
++ * Copyright © 2018 Simon Ser
++ *
++ * Permission to use, copy, modify, distribute, and sell this
++ * software and its documentation for any purpose is hereby granted
++ * without fee, provided that the above copyright notice appear in
++ * all copies and that both that copyright notice and this permission
++ * notice appear in supporting documentation, and that the name of
++ * the copyright holders not be used in advertising or publicity
++ * pertaining to distribution of the software without specific,
++ * written prior permission.  The copyright holders make no
++ * representations about the suitability of this software for any
++ * purpose.  It is provided "as is" without express or implied
++ * warranty.
++ *
++ * THE COPYRIGHT HOLDERS DISCLAIM ALL WARRANTIES WITH REGARD TO THIS
++ * SOFTWARE, INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
++ * FITNESS, IN NO EVENT SHALL THE COPYRIGHT HOLDERS BE LIABLE FOR ANY
++ * SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
++ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN
++ * AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
++ * ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
++ * THIS SOFTWARE.
++ */
++
++#include <stdbool.h>
++#include <stdlib.h>
++#include <stdint.h>
++#include "wayland-util.h"
++
++#ifndef __has_attribute
++# define __has_attribute(x) 0  /* Compatibility with non-clang compilers. */
++#endif
++
++#if (__has_attribute(visibility) || defined(__GNUC__) && __GNUC__ >= 4)
++#define WL_PRIVATE __attribute__ ((visibility("hidden")))
++#else
++#define WL_PRIVATE
++#endif
++
++extern const struct wl_interface wl_output_interface;
++extern const struct wl_interface zwlr_gamma_control_v1_interface;
++
++static const struct wl_interface *wlr_gamma_control_unstable_v1_types[] = {
++	NULL,
++	&zwlr_gamma_control_v1_interface,
++	&wl_output_interface,
++};
++
++static const struct wl_message zwlr_gamma_control_manager_v1_requests[] = {
++	{ "get_gamma_control", "no", wlr_gamma_control_unstable_v1_types + 1 },
++	{ "destroy", "", wlr_gamma_control_unstable_v1_types + 0 },
++};
++
++WL_PRIVATE const struct wl_interface zwlr_gamma_control_manager_v1_interface = {
++	"zwlr_gamma_control_manager_v1", 1,
++	2, zwlr_gamma_control_manager_v1_requests,
++	0, NULL,
++};
++
++static const struct wl_message zwlr_gamma_control_v1_requests[] = {
++	{ "set_gamma", "h", wlr_gamma_control_unstable_v1_types + 0 },
++	{ "destroy", "", wlr_gamma_control_unstable_v1_types + 0 },
++};
++
++static const struct wl_message zwlr_gamma_control_v1_events[] = {
++	{ "gamma_size", "u", wlr_gamma_control_unstable_v1_types + 0 },
++	{ "failed", "", wlr_gamma_control_unstable_v1_types + 0 },
++};
++
++WL_PRIVATE const struct wl_interface zwlr_gamma_control_v1_interface = {
++	"zwlr_gamma_control_v1", 1,
++	2, zwlr_gamma_control_v1_requests,
++	2, zwlr_gamma_control_v1_events,
++};
++
+diff --git a/src/wlr-gamma-client-protocol.h b/src/wlr-gamma-client-protocol.h
+new file mode 100644
+index 0000000..5852ffe
+--- /dev/null
++++ b/src/wlr-gamma-client-protocol.h
+@@ -0,0 +1,315 @@
++/* Generated by wayland-scanner 1.26.0 */
++
++#ifndef WLR_GAMMA_CONTROL_UNSTABLE_V1_CLIENT_PROTOCOL_H
++#define WLR_GAMMA_CONTROL_UNSTABLE_V1_CLIENT_PROTOCOL_H
++
++#include <stdint.h>
++#include <stddef.h>
++#include "wayland-client.h"
++
++#ifdef  __cplusplus
++extern "C" {
++#endif
++
++/**
++ * @page page_wlr_gamma_control_unstable_v1 The wlr_gamma_control_unstable_v1 protocol
++ * manage gamma tables of outputs
++ *
++ * @section page_desc_wlr_gamma_control_unstable_v1 Description
++ *
++ * This protocol allows a privileged client to set the gamma tables for
++ * outputs.
++ *
++ * Warning! The protocol described in this file is experimental and
++ * backward incompatible changes may be made. Backward compatible changes
++ * may be added together with the corresponding interface version bump.
++ * Backward incompatible changes are done by bumping the version number in
++ * the protocol and interface names and resetting the interface version.
++ * Once the protocol is to be declared stable, the 'z' prefix and the
++ * version number in the protocol and interface names are removed and the
++ * interface version number is reset.
++ *
++ * @section page_ifaces_wlr_gamma_control_unstable_v1 Interfaces
++ * - @subpage page_iface_zwlr_gamma_control_manager_v1 - manager to create per-output gamma controls
++ * - @subpage page_iface_zwlr_gamma_control_v1 - adjust gamma tables for an output
++ * @section page_copyright_wlr_gamma_control_unstable_v1 Copyright
++ * <pre>
++ *
++ * Copyright © 2015 Giulio camuffo
++ * Copyright © 2018 Simon Ser
++ *
++ * Permission to use, copy, modify, distribute, and sell this
++ * software and its documentation for any purpose is hereby granted
++ * without fee, provided that the above copyright notice appear in
++ * all copies and that both that copyright notice and this permission
++ * notice appear in supporting documentation, and that the name of
++ * the copyright holders not be used in advertising or publicity
++ * pertaining to distribution of the software without specific,
++ * written prior permission.  The copyright holders make no
++ * representations about the suitability of this software for any
++ * purpose.  It is provided "as is" without express or implied
++ * warranty.
++ *
++ * THE COPYRIGHT HOLDERS DISCLAIM ALL WARRANTIES WITH REGARD TO THIS
++ * SOFTWARE, INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
++ * FITNESS, IN NO EVENT SHALL THE COPYRIGHT HOLDERS BE LIABLE FOR ANY
++ * SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
++ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN
++ * AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
++ * ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
++ * THIS SOFTWARE.
++ * </pre>
++ */
++struct wl_output;
++struct zwlr_gamma_control_manager_v1;
++struct zwlr_gamma_control_v1;
++
++#ifndef ZWLR_GAMMA_CONTROL_MANAGER_V1_INTERFACE
++#define ZWLR_GAMMA_CONTROL_MANAGER_V1_INTERFACE
++/**
++ * @page page_iface_zwlr_gamma_control_manager_v1 zwlr_gamma_control_manager_v1
++ * @section page_iface_zwlr_gamma_control_manager_v1_desc Description
++ *
++ * This interface is a manager that allows creating per-output gamma
++ * controls.
++ * @section page_iface_zwlr_gamma_control_manager_v1_api API
++ * See @ref iface_zwlr_gamma_control_manager_v1.
++ */
++/**
++ * @defgroup iface_zwlr_gamma_control_manager_v1 The zwlr_gamma_control_manager_v1 interface
++ *
++ * This interface is a manager that allows creating per-output gamma
++ * controls.
++ */
++extern const struct wl_interface zwlr_gamma_control_manager_v1_interface;
++#endif
++#ifndef ZWLR_GAMMA_CONTROL_V1_INTERFACE
++#define ZWLR_GAMMA_CONTROL_V1_INTERFACE
++/**
++ * @page page_iface_zwlr_gamma_control_v1 zwlr_gamma_control_v1
++ * @section page_iface_zwlr_gamma_control_v1_desc Description
++ *
++ * This interface allows a client to adjust gamma tables for a particular
++ * output.
++ *
++ * The client will receive the gamma size, and will then be able to set gamma
++ * tables. At any time the compositor can send a failed event indicating that
++ * this object is no longer valid.
++ *
++ * There must always be at most one gamma control object per output, which
++ * has exclusive access to this particular output. When the gamma control
++ * object is destroyed, the gamma table is restored to its original value.
++ * @section page_iface_zwlr_gamma_control_v1_api API
++ * See @ref iface_zwlr_gamma_control_v1.
++ */
++/**
++ * @defgroup iface_zwlr_gamma_control_v1 The zwlr_gamma_control_v1 interface
++ *
++ * This interface allows a client to adjust gamma tables for a particular
++ * output.
++ *
++ * The client will receive the gamma size, and will then be able to set gamma
++ * tables. At any time the compositor can send a failed event indicating that
++ * this object is no longer valid.
++ *
++ * There must always be at most one gamma control object per output, which
++ * has exclusive access to this particular output. When the gamma control
++ * object is destroyed, the gamma table is restored to its original value.
++ */
++extern const struct wl_interface zwlr_gamma_control_v1_interface;
++#endif
++
++#define ZWLR_GAMMA_CONTROL_MANAGER_V1_GET_GAMMA_CONTROL 0
++#define ZWLR_GAMMA_CONTROL_MANAGER_V1_DESTROY 1
++
++
++/**
++ * @ingroup iface_zwlr_gamma_control_manager_v1
++ */
++#define ZWLR_GAMMA_CONTROL_MANAGER_V1_GET_GAMMA_CONTROL_SINCE_VERSION 1
++/**
++ * @ingroup iface_zwlr_gamma_control_manager_v1
++ */
++#define ZWLR_GAMMA_CONTROL_MANAGER_V1_DESTROY_SINCE_VERSION 1
++
++/** @ingroup iface_zwlr_gamma_control_manager_v1 */
++static inline void
++zwlr_gamma_control_manager_v1_set_user_data(struct zwlr_gamma_control_manager_v1 *zwlr_gamma_control_manager_v1, void *user_data)
++{
++	wl_proxy_set_user_data((struct wl_proxy *) zwlr_gamma_control_manager_v1, user_data);
++}
++
++/** @ingroup iface_zwlr_gamma_control_manager_v1 */
++static inline void *
++zwlr_gamma_control_manager_v1_get_user_data(struct zwlr_gamma_control_manager_v1 *zwlr_gamma_control_manager_v1)
++{
++	return wl_proxy_get_user_data((struct wl_proxy *) zwlr_gamma_control_manager_v1);
++}
++
++static inline uint32_t
++zwlr_gamma_control_manager_v1_get_version(struct zwlr_gamma_control_manager_v1 *zwlr_gamma_control_manager_v1)
++{
++	return wl_proxy_get_version((struct wl_proxy *) zwlr_gamma_control_manager_v1);
++}
++
++/**
++ * @ingroup iface_zwlr_gamma_control_manager_v1
++ *
++ * Create a gamma control that can be used to adjust gamma tables for the
++ * provided output.
++ */
++static inline struct zwlr_gamma_control_v1 *
++zwlr_gamma_control_manager_v1_get_gamma_control(struct zwlr_gamma_control_manager_v1 *zwlr_gamma_control_manager_v1, struct wl_output *output)
++{
++	struct wl_proxy *id;
++
++	id = wl_proxy_marshal_flags((struct wl_proxy *) zwlr_gamma_control_manager_v1,
++			 ZWLR_GAMMA_CONTROL_MANAGER_V1_GET_GAMMA_CONTROL, &zwlr_gamma_control_v1_interface, wl_proxy_get_version((struct wl_proxy *) zwlr_gamma_control_manager_v1), 0, NULL, output);
++
++	return (struct zwlr_gamma_control_v1 *) id;
++}
++
++/**
++ * @ingroup iface_zwlr_gamma_control_manager_v1
++ *
++ * All objects created by the manager will still remain valid, until their
++ * appropriate destroy request has been called.
++ */
++static inline void
++zwlr_gamma_control_manager_v1_destroy(struct zwlr_gamma_control_manager_v1 *zwlr_gamma_control_manager_v1)
++{
++	wl_proxy_marshal_flags((struct wl_proxy *) zwlr_gamma_control_manager_v1,
++			 ZWLR_GAMMA_CONTROL_MANAGER_V1_DESTROY, NULL, wl_proxy_get_version((struct wl_proxy *) zwlr_gamma_control_manager_v1), WL_MARSHAL_FLAG_DESTROY);
++}
++
++#ifndef ZWLR_GAMMA_CONTROL_V1_ERROR_ENUM
++#define ZWLR_GAMMA_CONTROL_V1_ERROR_ENUM
++enum zwlr_gamma_control_v1_error {
++	/**
++	 * invalid gamma tables
++	 */
++	ZWLR_GAMMA_CONTROL_V1_ERROR_INVALID_GAMMA = 1,
++};
++#endif /* ZWLR_GAMMA_CONTROL_V1_ERROR_ENUM */
++
++/**
++ * @ingroup iface_zwlr_gamma_control_v1
++ * @struct zwlr_gamma_control_v1_listener
++ */
++struct zwlr_gamma_control_v1_listener {
++	/**
++	 * size of gamma ramps
++	 *
++	 * Advertise the size of each gamma ramp.
++	 *
++	 * This event is sent immediately when the gamma control object is
++	 * created.
++	 */
++	void (*gamma_size)(void *data,
++			   struct zwlr_gamma_control_v1 *zwlr_gamma_control_v1,
++			   uint32_t size);
++	/**
++	 * object no longer valid
++	 *
++	 * This event indicates that the gamma control is no longer
++	 * valid. This can happen for a number of reasons, including: - The
++	 * output doesn't support gamma tables - Setting the gamma tables
++	 * failed - Another client already has exclusive gamma control for
++	 * this output - The compositor has transfered gamma control to
++	 * another client
++	 *
++	 * Upon receiving this event, the client should destroy this
++	 * object.
++	 */
++	void (*failed)(void *data,
++		       struct zwlr_gamma_control_v1 *zwlr_gamma_control_v1);
++};
++
++/**
++ * @ingroup iface_zwlr_gamma_control_v1
++ */
++static inline int
++zwlr_gamma_control_v1_add_listener(struct zwlr_gamma_control_v1 *zwlr_gamma_control_v1,
++				   const struct zwlr_gamma_control_v1_listener *listener, void *data)
++{
++	return wl_proxy_add_listener((struct wl_proxy *) zwlr_gamma_control_v1,
++				     (void (**)(void)) listener, data);
++}
++
++#define ZWLR_GAMMA_CONTROL_V1_SET_GAMMA 0
++#define ZWLR_GAMMA_CONTROL_V1_DESTROY 1
++
++/**
++ * @ingroup iface_zwlr_gamma_control_v1
++ */
++#define ZWLR_GAMMA_CONTROL_V1_GAMMA_SIZE_SINCE_VERSION 1
++/**
++ * @ingroup iface_zwlr_gamma_control_v1
++ */
++#define ZWLR_GAMMA_CONTROL_V1_FAILED_SINCE_VERSION 1
++
++/**
++ * @ingroup iface_zwlr_gamma_control_v1
++ */
++#define ZWLR_GAMMA_CONTROL_V1_SET_GAMMA_SINCE_VERSION 1
++/**
++ * @ingroup iface_zwlr_gamma_control_v1
++ */
++#define ZWLR_GAMMA_CONTROL_V1_DESTROY_SINCE_VERSION 1
++
++/** @ingroup iface_zwlr_gamma_control_v1 */
++static inline void
++zwlr_gamma_control_v1_set_user_data(struct zwlr_gamma_control_v1 *zwlr_gamma_control_v1, void *user_data)
++{
++	wl_proxy_set_user_data((struct wl_proxy *) zwlr_gamma_control_v1, user_data);
++}
++
++/** @ingroup iface_zwlr_gamma_control_v1 */
++static inline void *
++zwlr_gamma_control_v1_get_user_data(struct zwlr_gamma_control_v1 *zwlr_gamma_control_v1)
++{
++	return wl_proxy_get_user_data((struct wl_proxy *) zwlr_gamma_control_v1);
++}
++
++static inline uint32_t
++zwlr_gamma_control_v1_get_version(struct zwlr_gamma_control_v1 *zwlr_gamma_control_v1)
++{
++	return wl_proxy_get_version((struct wl_proxy *) zwlr_gamma_control_v1);
++}
++
++/**
++ * @ingroup iface_zwlr_gamma_control_v1
++ *
++ * Set the gamma table. The file descriptor can be memory-mapped to provide
++ * the raw gamma table, which contains successive gamma ramps for the red,
++ * green and blue channels. Each gamma ramp is an array of 16-byte unsigned
++ * integers which has the same length as the gamma size.
++ *
++ * The file descriptor data must have the same length as three times the
++ * gamma size.
++ */
++static inline void
++zwlr_gamma_control_v1_set_gamma(struct zwlr_gamma_control_v1 *zwlr_gamma_control_v1, int32_t fd)
++{
++	wl_proxy_marshal_flags((struct wl_proxy *) zwlr_gamma_control_v1,
++			 ZWLR_GAMMA_CONTROL_V1_SET_GAMMA, NULL, wl_proxy_get_version((struct wl_proxy *) zwlr_gamma_control_v1), 0, fd);
++}
++
++/**
++ * @ingroup iface_zwlr_gamma_control_v1
++ *
++ * Destroys the gamma control object. If the object is still valid, this
++ * restores the original gamma tables.
++ */
++static inline void
++zwlr_gamma_control_v1_destroy(struct zwlr_gamma_control_v1 *zwlr_gamma_control_v1)
++{
++	wl_proxy_marshal_flags((struct wl_proxy *) zwlr_gamma_control_v1,
++			 ZWLR_GAMMA_CONTROL_V1_DESTROY, NULL, wl_proxy_get_version((struct wl_proxy *) zwlr_gamma_control_v1), WL_MARSHAL_FLAG_DESTROY);
++}
++
++#ifdef  __cplusplus
++}
++#endif
++
++#endif
+diff --git a/src/wlr.rs b/src/wlr.rs
+new file mode 100644
+index 0000000..6952e55
+--- /dev/null
++++ b/src/wlr.rs
+@@ -0,0 +1,46 @@
++// SPDX-License-Identifier: GPL-3.0-or-later
++//! Sway/wlroots gamma control backend using zwlr_gamma_control_manager_v1.
++
++use anyhow::{Result, bail};
++
++unsafe extern "C" {
++    fn wlr_gamma_available() -> i32;
++    fn wlr_gamma_open(gamma_size: *mut u32) -> i32;
++    fn wlr_gamma_set(r: *const u16, g: *const u16, b: *const u16, size: libc::size_t) -> i32;
++    fn wlr_gamma_close();
++}
++
++pub struct WlrGamma {
++    pub size: usize,
++}
++
++impl WlrGamma {
++    pub fn is_available() -> bool {
++        unsafe { wlr_gamma_available() != 0 }
++    }
++
++    pub fn connect() -> Result<Self> {
++        let mut size: u32 = 0;
++        let ret = unsafe { wlr_gamma_open(&mut size) };
++        if ret != 0 || size == 0 {
++            bail!("wlr-gamma-control: could not acquire gamma control (code {ret}). If gammastep or wlsunset is running, stop it first.");
++        }
++        Ok(Self { size: size as usize })
++    }
++
++    pub fn set_gamma(&mut self, lut: &[Vec<u16>; 3]) -> Result<()> {
++        let ret = unsafe {
++            wlr_gamma_set(lut[0].as_ptr(), lut[1].as_ptr(), lut[2].as_ptr(), lut[0].len())
++        };
++        if ret != 0 {
++            bail!("wlr_gamma_set failed with code {ret}");
++        }
++        Ok(())
++    }
++}
++
++impl Drop for WlrGamma {
++    fn drop(&mut self) {
++        unsafe { wlr_gamma_close() };
++    }
++}
+diff --git a/src/wlr_gamma.c b/src/wlr_gamma.c
+new file mode 100644
+index 0000000..0df0870
+--- /dev/null
++++ b/src/wlr_gamma.c
+@@ -0,0 +1,155 @@
++// SPDX-License-Identifier: GPL-3.0-or-later
++#define _GNU_SOURCE
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <unistd.h>
++#include <sys/mman.h>
++#include <wayland-client.h>
++#include "wlr-gamma-client-protocol.h"
++
++static struct wl_display *display = NULL;
++static struct wl_registry *registry = NULL;
++static struct zwlr_gamma_control_manager_v1 *gamma_mgr = NULL;
++static struct wl_output *target_output = NULL;
++static struct zwlr_gamma_control_v1 *gamma_ctrl = NULL;
++static uint32_t current_gamma_size = 0;
++static int gamma_failed = 0;
++
++static void gamma_size_event(void *data, struct zwlr_gamma_control_v1 *control, uint32_t size) {
++    (void)data;
++    (void)control;
++    current_gamma_size = size;
++}
++
++static void gamma_failed_event(void *data, struct zwlr_gamma_control_v1 *control) {
++    (void)data;
++    (void)control;
++    gamma_failed = 1;
++}
++
++static const struct zwlr_gamma_control_v1_listener gamma_listener = {
++    .gamma_size = gamma_size_event,
++    .failed = gamma_failed_event,
++};
++
++static void registry_global(void *data, struct wl_registry *reg, uint32_t id, const char *interface, uint32_t version) {
++    (void)data;
++    (void)version;
++    if (strcmp(interface, zwlr_gamma_control_manager_v1_interface.name) == 0) {
++        gamma_mgr = (struct zwlr_gamma_control_manager_v1 *)wl_registry_bind(reg, id, &zwlr_gamma_control_manager_v1_interface, 1);
++    } else if (strcmp(interface, "wl_output") == 0 && !target_output) {
++        target_output = (struct wl_output *)wl_registry_bind(reg, id, &wl_output_interface, 1);
++    }
++}
++
++static void registry_remove(void *data, struct wl_registry *reg, uint32_t id) {
++    (void)data;
++    (void)reg;
++    (void)id;
++}
++
++static const struct wl_registry_listener registry_listener = {
++    .global = registry_global,
++    .global_remove = registry_remove,
++};
++
++int wlr_gamma_available(void) {
++    const char *wayland_display = getenv("WAYLAND_DISPLAY");
++    if (!wayland_display) return 0;
++    struct wl_display *d = wl_display_connect(NULL);
++    if (!d) return 0;
++    wl_display_disconnect(d);
++    return 1;
++}
++
++void wlr_gamma_close(void) {
++    if (gamma_ctrl) {
++        zwlr_gamma_control_v1_destroy(gamma_ctrl);
++        gamma_ctrl = NULL;
++    }
++    if (gamma_mgr) {
++        zwlr_gamma_control_manager_v1_destroy(gamma_mgr);
++        gamma_mgr = NULL;
++    }
++    if (target_output) {
++        wl_output_destroy(target_output);
++        target_output = NULL;
++    }
++    if (registry) {
++        wl_registry_destroy(registry);
++        registry = NULL;
++    }
++    if (display) {
++        wl_display_disconnect(display);
++        display = NULL;
++    }
++    current_gamma_size = 0;
++    gamma_failed = 0;
++}
++
++int wlr_gamma_open(uint32_t *gamma_size) {
++    wlr_gamma_close();
++
++    display = wl_display_connect(NULL);
++    if (!display) return -1;
++
++    registry = wl_display_get_registry(display);
++    if (!registry) {
++        wlr_gamma_close();
++        return -1;
++    }
++    wl_registry_add_listener(registry, &registry_listener, NULL);
++    wl_display_roundtrip(display);
++
++    if (!gamma_mgr || !target_output) {
++        wlr_gamma_close();
++        return -2;
++    }
++
++    gamma_ctrl = zwlr_gamma_control_manager_v1_get_gamma_control(gamma_mgr, target_output);
++    if (!gamma_ctrl) {
++        wlr_gamma_close();
++        return -3;
++    }
++    zwlr_gamma_control_v1_add_listener(gamma_ctrl, &gamma_listener, NULL);
++    wl_display_roundtrip(display);
++
++    if (gamma_failed || current_gamma_size == 0) {
++        wlr_gamma_close();
++        return -4;
++    }
++
++    if (gamma_size) *gamma_size = current_gamma_size;
++    return 0;
++}
++
++int wlr_gamma_set(const uint16_t *r, const uint16_t *g, const uint16_t *b, size_t size) {
++    if (!gamma_ctrl || !display || current_gamma_size != size || gamma_failed) return -1;
++
++    size_t total_bytes = 3 * size * sizeof(uint16_t);
++    int fd = memfd_create("t2-truetone-gamma", MFD_CLOEXEC);
++    if (fd < 0) return -2;
++
++    if (ftruncate(fd, total_bytes) < 0) {
++        close(fd);
++        return -3;
++    }
++
++    void *map = mmap(NULL, total_bytes, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
++    if (map == MAP_FAILED) {
++        close(fd);
++        return -4;
++    }
++
++    uint16_t *dest = (uint16_t *)map;
++    memcpy(dest, r, size * sizeof(uint16_t));
++    memcpy(dest + size, g, size * sizeof(uint16_t));
++    memcpy(dest + 2 * size, b, size * sizeof(uint16_t));
++    munmap(map, total_bytes);
++
++    zwlr_gamma_control_v1_set_gamma(gamma_ctrl, fd);
++    close(fd);
++    wl_display_flush(display);
++    return 0;
++}

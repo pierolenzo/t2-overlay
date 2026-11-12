@@ -17,6 +17,7 @@ KEYWORDS=""
 IUSE="gnome-shell +gui systemd"
 
 RDEPEND="
+	dev-libs/wayland
 	virtual/udev
 	gui? (
 		gui-libs/gtk:4
@@ -60,6 +61,10 @@ src_unpack() {
 	cargo_live_src_unpack
 	popd >/dev/null || die
 }
+
+PATCHES=(
+	"${FILESDIR}/0001-support-wlroots-and-sysfs.patch"
+)
 
 src_prepare() {
 	default

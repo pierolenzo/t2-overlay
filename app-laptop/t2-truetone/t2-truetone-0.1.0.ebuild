@@ -170,6 +170,7 @@ KEYWORDS="~amd64"
 IUSE="gnome-shell +gui systemd"
 
 RDEPEND="
+	dev-libs/wayland
 	virtual/udev
 	gui? (
 		gui-libs/gtk:4
@@ -206,6 +207,10 @@ pkg_setup() {
 	rust_pkg_setup
 	linux-info_pkg_setup
 }
+
+PATCHES=(
+	"${FILESDIR}/0001-support-wlroots-and-sysfs.patch"
+)
 
 src_prepare() {
 	default
