@@ -1,0 +1,50 @@
+diff -uprN a/org.t2powerexplorer.policy b/org.t2powerexplorer.policy
+--- a/org.t2powerexplorer.policy	2026-09-12 11:29:54.431219473 +0200
++++ b/org.t2powerexplorer.policy	2026-11-12 17:14:47.947105322 +0100
+@@ -7,6 +7,6 @@
+     <description>Read privileged display power diagnostics</description>
+     <message>Authentication is required to inspect display power diagnostics</message>
+     <defaults><allow_any>no</allow_any><allow_inactive>no</allow_inactive><allow_active>yes</allow_active></defaults>
+-    <annotate key="org.freedesktop.policykit.exec.path">/usr/local/libexec/t2-power-explorer-status</annotate>
++    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/t2-power-explorer-status</annotate>
+   </action>
+ </policyconfig>
+diff -uprN a/src/diagnostics.rs b/src/diagnostics.rs
+--- a/src/diagnostics.rs	2026-09-12 11:29:54.431750661 +0200
++++ b/src/diagnostics.rs	2026-11-12 17:14:47.947044822 +0100
+@@ -3,7 +3,7 @@ use std::process::Command;
+ 
+ use crate::model::PciPmCapabilities;
+ 
+-const STATUS_HELPER: &str = "/usr/local/libexec/t2-power-explorer-status";
++const STATUS_HELPER: &str = "/usr/libexec/t2-power-explorer-status";
+ 
+ #[derive(Clone, Debug, Default)]
+ pub struct Diagnostics {
+diff -uprN a/src/ui.rs b/src/ui.rs
+--- a/src/ui.rs	2026-11-11 03:30:45.248043704 +0100
++++ b/src/ui.rs	2026-11-12 17:14:47.946961796 +0100
+@@ -13,14 +13,17 @@ use crate::model::{Assessment, DeviceKin
+ const APP_VERSION: &str = "0.02";
+ 
+ fn kait2en_brand() -> gtk::DrawingArea {
+-    // White type for dark surfaces, dark type for light ones. Without the
+-    // light file the white one is used.
+-    let dark = gtk::gdk_pixbuf::Pixbuf::from_file("/usr/local/share/kait2en/kait2en-wordmark.png")
+-        .expect("failed to load kait2en wordmark");
+-    let light = gtk::gdk_pixbuf::Pixbuf::from_file("/usr/local/share/kait2en/kait2en-wordmark-light.png")
+-        .unwrap_or_else(|_| dark.clone());
+     let brand = gtk::DrawingArea::new();
+     brand.set_content_width(80); brand.set_content_height(21); brand.set_size_request(80, 21);
++
++    let dark = gtk::gdk_pixbuf::Pixbuf::from_file("/usr/share/kait2en/kait2en-wordmark.png")
++        .or_else(|_| gtk::gdk_pixbuf::Pixbuf::from_file("/usr/local/share/kait2en/kait2en-wordmark.png"))
++        .ok();
++    let Some(dark) = dark else { return brand; };
++    let light = gtk::gdk_pixbuf::Pixbuf::from_file("/usr/share/kait2en/kait2en-wordmark-light.png")
++        .or_else(|_| gtk::gdk_pixbuf::Pixbuf::from_file("/usr/local/share/kait2en/kait2en-wordmark-light.png"))
++        .unwrap_or_else(|_| dark.clone());
++
+     brand.set_draw_func(move |_area, context, width, height| {
+         let pixbuf = if adw::StyleManager::default().is_dark() { &dark } else { &light };
+         let scale = f64::min(width as f64 / pixbuf.width() as f64, height as f64 / pixbuf.height() as f64);
