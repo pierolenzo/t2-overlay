@@ -1,0 +1,92 @@
+diff -uprN a/org.t2powertune.gtk.desktop b/org.t2powertune.gtk.desktop
+--- a/org.t2powertune.gtk.desktop	2026-09-12 11:29:54.432515790 +0200
++++ b/org.t2powertune.gtk.desktop	2026-11-12 16:54:28.375522778 +0100
+@@ -3,8 +3,8 @@ Type=Application
+ Version=1.0
+ Name=T2 Power Tune
+ Comment=Tune PCIe ASPM and system power-saving settings
+-Exec=/usr/local/bin/t2-power-tune
+-TryExec=/usr/local/bin/t2-power-tune
++Exec=/usr/bin/t2-power-tune
++TryExec=/usr/bin/t2-power-tune
+ Icon=org.t2powertune.gtk
+ Terminal=false
+ Categories=System;
+diff -uprN a/org.t2powertune.policy b/org.t2powertune.policy
+--- a/org.t2powertune.policy	2026-09-12 11:29:54.432515790 +0200
++++ b/org.t2powertune.policy	2026-11-12 16:54:28.375332034 +0100
+@@ -1,6 +1,6 @@
+ <?xml version="1.0" encoding="UTF-8"?>
+ <!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN" "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+ <policyconfig><vendor>KaiT2en</vendor><vendor_url>https://kait2en.github.io/</vendor_url>
+-<action id="org.t2powertune.configure"><description>Configure PCIe ASPM and power-saving tunables</description><message>Authentication is required to change system power tuning</message><defaults><allow_any>no</allow_any><allow_inactive>no</allow_inactive><allow_active>auth_admin_keep</allow_active></defaults><annotate key="org.freedesktop.policykit.exec.path">/usr/local/libexec/t2-power-tune-helper</annotate></action>
+-<action id="org.t2powertune.status"><description>Read CPU C-state residency counters</description><message>Authentication is required to read package C-state counters</message><defaults><allow_any>no</allow_any><allow_inactive>no</allow_inactive><allow_active>yes</allow_active></defaults><annotate key="org.freedesktop.policykit.exec.path">/usr/local/libexec/t2-power-tune-status</annotate></action>
++<action id="org.t2powertune.configure"><description>Configure PCIe ASPM and power-saving tunables</description><message>Authentication is required to change system power tuning</message><defaults><allow_any>no</allow_any><allow_inactive>no</allow_inactive><allow_active>auth_admin_keep</allow_active></defaults><annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/t2-power-tune-helper</annotate></action>
++<action id="org.t2powertune.status"><description>Read CPU C-state residency counters</description><message>Authentication is required to read package C-state counters</message><defaults><allow_any>no</allow_any><allow_inactive>no</allow_inactive><allow_active>yes</allow_active></defaults><annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/t2-power-tune-status</annotate></action>
+ </policyconfig>
+diff -uprN a/t2-power-tune-helper b/t2-power-tune-helper
+--- a/t2-power-tune-helper	2026-11-11 03:30:45.248633894 +0100
++++ b/t2-power-tune-helper	2026-11-12 16:54:28.375170120 +0100
+@@ -314,7 +314,7 @@ def validate(raw):
+ def command(item, start):
+     kind, ident, original, target, _enabled = item; value = target if start else original
+     if kind == "aspm": return f"/usr/bin/setpci -s {ident} CAP_EXP+10.w={int(value):x}:0003"
+-    if kind == "ltr": return f"/usr/local/libexec/t2-power-tune-helper ltr-set '{ident}' {value}"
++    if kind == "ltr": return f"/usr/libexec/t2-power-tune-helper ltr-set '{ident}' {value}"
+     # systemd expands percent specifiers even inside ExecStart shell strings.
+     return f"/usr/bin/printf '%%s\\n' '{value}' > '{ident}'"
+ 
+diff -uprN a/t2-power-tune.py b/t2-power-tune.py
+--- a/t2-power-tune.py	2026-11-11 03:30:45.248633894 +0100
++++ b/t2-power-tune.py	2026-11-12 16:54:28.374902412 +0100
+@@ -6,24 +6,35 @@ from gi.repository import Adw, Gdk, GdkP
+ 
+ APP_ID="org.t2powertune.gtk"
+ APP_VERSION="0.02"
+-HELPER="/usr/local/libexec/t2-power-tune-helper"
+-STATUS="/usr/local/libexec/t2-power-tune-status"
++HELPER="/usr/libexec/t2-power-tune-helper"
++STATUS="/usr/libexec/t2-power-tune-status"
+ SERVICE="/etc/systemd/system/kait2en-power-tune.service"
+ 
+ def kait2en_brand():
+-    # White type for dark surfaces, dark type for light ones. Without the
+-    # light file the white one is used.
+-    dark=GdkPixbuf.Pixbuf.new_from_file("/usr/local/share/kait2en/kait2en-wordmark.png")
+-    try: light=GdkPixbuf.Pixbuf.new_from_file("/usr/local/share/kait2en/kait2en-wordmark-light.png")
+-    except GLib.Error: light=dark
+-    manager=Adw.StyleManager.get_default()
+-    brand=Gtk.DrawingArea(content_width=80,content_height=21)
+-    def draw(_area,context,width,height):
+-        pixbuf=dark if manager.get_dark() else light
+-        scale=min(width/pixbuf.get_width(),height/pixbuf.get_height())
+-        context.save(); context.translate((width-pixbuf.get_width()*scale)/2,(height-pixbuf.get_height()*scale)/2)
+-        context.scale(scale,scale); Gdk.cairo_set_source_pixbuf(context,pixbuf,0,0); context.paint(); context.restore()
+-    brand.set_draw_func(draw); brand.set_size_request(80,21); manager.connect("notify::dark",lambda *_:brand.queue_draw()); return brand
++    dark_path = "/usr/share/kait2en/kait2en-wordmark.png"
++    if not os.path.exists(dark_path):
++        dark_path = "/usr/local/share/kait2en/kait2en-wordmark.png"
++    light_path = "/usr/share/kait2en/kait2en-wordmark-light.png"
++    if not os.path.exists(light_path):
++        light_path = "/usr/local/share/kait2en/kait2en-wordmark-light.png"
++    try:
++        dark = GdkPixbuf.Pixbuf.new_from_file(dark_path)
++    except Exception:
++        dark = None
++    if dark is None:
++        return Gtk.Box()
++    try:
++        light = GdkPixbuf.Pixbuf.new_from_file(light_path)
++    except Exception:
++        light = dark
++    manager = Adw.StyleManager.get_default()
++    brand = Gtk.DrawingArea(content_width=80, content_height=21)
++    def draw(_area, context, width, height):
++        pixbuf = dark if manager.get_dark() else light
++        scale = min(width / pixbuf.get_width(), height / pixbuf.get_height())
++        context.save(); context.translate((width - pixbuf.get_width() * scale) / 2, (height - pixbuf.get_height() * scale) / 2)
++        context.scale(scale, scale); Gdk.cairo_set_source_pixbuf(context, pixbuf, 0, 0); context.paint(); context.restore()
++    brand.set_draw_func(draw); brand.set_size_request(80, 21); manager.connect("notify::dark", lambda *_: brand.queue_draw()); return brand
+ 
+ SECTION_HELP={
+     "PCIe ASPM candidates":("PCIe ASPM link states",

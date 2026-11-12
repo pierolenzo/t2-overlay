@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+	<maintainer type="person">
+		<email>piero@gentoo.local</email>
+		<name>Piero</name>
+	</maintainer>
+	<upstream>
+		<remote-id type="github">kaiT2en/KaiT2en-Fedora</remote-id>
+		<bugs-to>https://github.com/kaiT2en/KaiT2en-Fedora/issues</bugs-to>
+	</upstream>
+	<longdescription lang="en">
+		t2-power-tune is a GTK4/libadwaita power-saving and tuning utility for Apple T2 MacBooks.
+		It configures PCIe Active State Power Management (ASPM), Latency Tolerance Reporting (LTR),
+		Runtime PM for devices, wake sources, and monitors CPU package C-state residency.
+	</longdescription>
+</pkgmetadata>
