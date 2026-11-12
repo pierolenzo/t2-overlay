@@ -135,7 +135,7 @@ index 3471621..fd7a05e 100644
      Ok(())
  }
 diff --git a/src/autobright/mod.rs b/src/autobright/mod.rs
-index 3e815de..fdbf79c 100644
+index 3e815de..3ad3172 100644
 --- a/src/autobright/mod.rs
 +++ b/src/autobright/mod.rs
 @@ -57,7 +57,11 @@ impl<'a> Panel<'a> {
@@ -151,6 +151,44 @@ index 3e815de..fdbf79c 100644
              .ok_or_else(|| anyhow!("no backlight device with max {}", backlight.max))?;
          Ok(Panel { connection, backlight, actual: device.join("actual_brightness") })
      }
+@@ -165,14 +169,20 @@ pub fn run(lux: Receiver<f32>, stop: Arc<AtomicBool>, live: Arc<Mutex<Live>>) ->
+         panel.backlight.connector, panel.backlight.min, panel.backlight.max
+     ));
+ 
+-    gnome::take_over(&saved_settings)?;
+-    if let Err(error) = gnome::enable_extension(EXTENSION) {
+-        log(&format!("enabling the shell extension failed: {error:#}"));
++    if crate::gnome::is_gnome() {
++        gnome::take_over(&saved_settings)?;
++        if let Err(error) = gnome::enable_extension(EXTENSION) {
++            log(&format!("enabling the shell extension failed: {error:#}"));
++        }
++        if let Err(error) = shell::disable_auto_target(&connection) {
++            log(&format!("gnome-shell SetAutoBrightnessTarget: {error:#}"));
++        }
+     }
+-    shell::disable_auto_target(&connection)?;
+     let result = run_loop(lux, &stop, &live, &mut panel, curve, &curve_path);
+-    if let Err(error) = gnome::restore(&saved_settings) {
+-        log(&format!("restoring GNOME settings failed: {error:#}"));
++    if crate::gnome::is_gnome() {
++        if let Err(error) = gnome::restore(&saved_settings) {
++            log(&format!("restoring GNOME settings failed: {error:#}"));
++        }
+     }
+     *live.lock().unwrap() = Live::default();
+     result
+@@ -187,7 +197,9 @@ fn run_loop(
+     curve_path: &Path,
+ ) -> Result<()> {
+     let (manual_sender, manual) = mpsc::channel();
+-    shell::watch(manual_sender);
++    if crate::gnome::is_gnome() {
++        shell::watch(manual_sender);
++    }
+ 
+     let mut ramp: Option<Ramp> = None;
+     let mut commit_at: Option<Instant> = None;
 diff --git a/src/daemon.rs b/src/daemon.rs
 index 0ffd142..a4883e3 100644
 --- a/src/daemon.rs
@@ -287,14 +325,14 @@ index 0ffd142..a4883e3 100644
                  return;
              }
 diff --git a/src/gnome.rs b/src/gnome.rs
-index 550f0ca..10e9c54 100644
+index 550f0ca..b679b03 100644
 --- a/src/gnome.rs
 +++ b/src/gnome.rs
 @@ -38,9 +38,17 @@ fn log(msg: &str) {
      eprintln!("t2-truetone: {msg}");
  }
  
-+fn is_gnome() -> bool {
++pub fn is_gnome() -> bool {
 +    std::env::var_os("GNOME_SETUP_DISPLAY").is_some()
 +        || std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_default().to_lowercase().contains("gnome")
 +}
@@ -789,10 +827,10 @@ index 0000000..6952e55
 +}
 diff --git a/src/wlr_gamma.c b/src/wlr_gamma.c
 new file mode 100644
-index 0000000..0df0870
+index 0000000..5264c51
 --- /dev/null
 +++ b/src/wlr_gamma.c
-@@ -0,0 +1,155 @@
+@@ -0,0 +1,178 @@
 +// SPDX-License-Identifier: GPL-3.0-or-later
 +#define _GNU_SOURCE
 +#include <stdio.h>
@@ -920,9 +958,10 @@ index 0000000..0df0870
 +}
 +
 +int wlr_gamma_set(const uint16_t *r, const uint16_t *g, const uint16_t *b, size_t size) {
-+    if (!gamma_ctrl || !display || current_gamma_size != size || gamma_failed) return -1;
++    if (!gamma_ctrl || !display || gamma_failed || current_gamma_size == 0) return -1;
 +
-+    size_t total_bytes = 3 * size * sizeof(uint16_t);
++    size_t out_size = current_gamma_size;
++    size_t total_bytes = 3 * out_size * sizeof(uint16_t);
 +    int fd = memfd_create("t2-truetone-gamma", MFD_CLOEXEC);
 +    if (fd < 0) return -2;
 +
@@ -938,9 +977,31 @@ index 0000000..0df0870
 +    }
 +
 +    uint16_t *dest = (uint16_t *)map;
-+    memcpy(dest, r, size * sizeof(uint16_t));
-+    memcpy(dest + size, g, size * sizeof(uint16_t));
-+    memcpy(dest + 2 * size, b, size * sizeof(uint16_t));
++    uint16_t *dest_r = dest;
++    uint16_t *dest_g = dest + out_size;
++    uint16_t *dest_b = dest + 2 * out_size;
++
++    if (size == out_size) {
++        memcpy(dest_r, r, out_size * sizeof(uint16_t));
++        memcpy(dest_g, g, out_size * sizeof(uint16_t));
++        memcpy(dest_b, b, out_size * sizeof(uint16_t));
++    } else {
++        // Resample from `size` entries to `out_size` entries via linear interpolation
++        for (size_t i = 0; i < out_size; i++) {
++            double pos = ((double)i / (double)(out_size - 1)) * (double)(size - 1);
++            size_t idx = (size_t)pos;
++            double frac = pos - (double)idx;
++            if (idx >= size - 1) {
++                dest_r[i] = r[size - 1];
++                dest_g[i] = g[size - 1];
++                dest_b[i] = b[size - 1];
++            } else {
++                dest_r[i] = (uint16_t)((1.0 - frac) * r[idx] + frac * r[idx + 1]);
++                dest_g[i] = (uint16_t)((1.0 - frac) * g[idx] + frac * g[idx + 1]);
++                dest_b[i] = (uint16_t)((1.0 - frac) * b[idx] + frac * b[idx + 1]);
++            }
++        }
++    }
 +    munmap(map, total_bytes);
 +
 +    zwlr_gamma_control_v1_set_gamma(gamma_ctrl, fd);
