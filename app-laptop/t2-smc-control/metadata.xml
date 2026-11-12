@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+	<maintainer type="person">
+		<email>piero@gentoo.local</email>
+		<name>Piero</name>
+	</maintainer>
+	<upstream>
+		<remote-id type="github">kaiT2en/KaiT2en-Fedora</remote-id>
+		<bugs-to>https://github.com/kaiT2en/KaiT2en-Fedora/issues</bugs-to>
+	</upstream>
+	<longdescription lang="en">
+		t2-smc-control is a GTK4/libadwaita control application and background gauging
+		daemon (t2-smc-gaugingd) for Apple T2 MacBooks using the t2smc/macsmc kernel
+		driver. It displays fan speeds, temperature sensors, live power and battery
+		telemetry, RTC hardware clock, and battery charge threshold calibration.
+	</longdescription>
+</pkgmetadata>
