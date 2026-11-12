@@ -74,9 +74,15 @@ src_prepare() {
 		org.t2truetone.gtk.desktop \
 		systemd/t2-truetone.service || die
 
-	# Grant video group access to T2 ambient light sensor for Gentoo desktop sessions
+	# Grant video group access to T2 ambient light sensor and backlight for Gentoo desktop sessions
 	sed -i 's|TAG+="uaccess"|TAG+="uaccess", GROUP="video", MODE="0660"|g' \
 		udev/70-t2-truetone.rules || die
+
+	cat >> udev/70-t2-truetone.rules <<- 'EOF'
+
+	# Grant video group write access to display backlight sysfs brightness
+	ACTION=="add|change", SUBSYSTEM=="backlight", RUN+="/bin/chgrp video /sys/class/backlight/%k/brightness", RUN+="/bin/chmod g+w /sys/class/backlight/%k/brightness"
+	EOF
 }
 
 src_compile() {
@@ -118,6 +124,7 @@ src_install() {
 pkg_postinst() {
 	udev_reload
 	udevadm trigger --action=change --subsystem-match=hidraw 2>/dev/null || true
+	udevadm trigger --action=change --subsystem-match=backlight 2>/dev/null || true
 	if use gui; then
 		xdg_icon_cache_reload
 		xdg_desktop_database_update
