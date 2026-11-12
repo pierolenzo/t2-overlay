@@ -1,0 +1,239 @@
+diff --git a/src/main.rs b/src/main.rs
+index 4845a75..67c7dc7 100644
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -17,19 +17,35 @@ use gtk4::{gio, glib};
+ 
+ const APP_ID: &str = "org.t2smccontrol.gtk";
+ const APP_VERSION: &str = "0.02";
+-const HWMON_NAMES: &[&str] = &["t2smc", "macsmc"];
++const HWMON_NAMES: &[&str] = &["t2smc", "macsmc", "macsmc_hwmon"];
+ const RTC_NAME_PREFIX: &str = "t2smc ";
+ const HWCLOCK_PATH: &str = "/usr/sbin/hwclock";
+ 
++fn extract_smc_key(raw: &str) -> String {
++    let raw = raw.trim();
++    if let Some(start) = raw.rfind('(') {
++        if let Some(end) = raw[start..].find(')') {
++            let candidate = raw[start + 1..start + end].trim();
++            if candidate.len() == 4 {
++                return candidate.to_string();
++            }
++        }
++    }
++    raw.to_string()
++}
++
+ fn kait2en_brand() -> gtk4::DrawingArea {
+-    // White type for dark surfaces, dark type for light ones. Without the
+-    // light file the white one is used.
+-    let dark = gtk4::gdk_pixbuf::Pixbuf::from_file("/usr/local/share/kait2en/kait2en-wordmark.png")
+-        .expect("failed to load kait2en wordmark");
+-    let light = gtk4::gdk_pixbuf::Pixbuf::from_file("/usr/local/share/kait2en/kait2en-wordmark-light.png")
+-        .unwrap_or_else(|_| dark.clone());
+     let brand = gtk4::DrawingArea::new();
+     brand.set_content_width(80); brand.set_content_height(21); brand.set_size_request(80, 21);
++
++    let dark = gtk4::gdk_pixbuf::Pixbuf::from_file("/usr/share/kait2en/kait2en-wordmark.png")
++        .or_else(|_| gtk4::gdk_pixbuf::Pixbuf::from_file("/usr/local/share/kait2en/kait2en-wordmark.png"))
++        .ok();
++    let Some(dark) = dark else { return brand; };
++    let light = gtk4::gdk_pixbuf::Pixbuf::from_file("/usr/share/kait2en/kait2en-wordmark-light.png")
++        .or_else(|_| gtk4::gdk_pixbuf::Pixbuf::from_file("/usr/local/share/kait2en/kait2en-wordmark-light.png"))
++        .unwrap_or_else(|_| dark.clone());
++
+     brand.set_draw_func(move |_area, context, width, height| {
+         let pixbuf = if adw::StyleManager::default().is_dark() { &dark } else { &light };
+         let scale = f64::min(width as f64 / pixbuf.width() as f64, height as f64 / pixbuf.height() as f64);
+@@ -270,7 +286,8 @@ fn find_t2smc_rtc() -> Option<PathBuf> {
+     for entry in glob::glob("/sys/class/rtc/rtc*/name").ok()? {
+         let path = entry.ok()?;
+         let name = fs::read_to_string(&path).ok()?;
+-        if name.trim().starts_with(RTC_NAME_PREFIX) {
++        let name = name.trim();
++        if name.starts_with(RTC_NAME_PREFIX) || name.contains("macsmc") {
+             return path.parent().map(Path::to_path_buf);
+         }
+     }
+@@ -364,13 +381,64 @@ impl BatteryCurrentAverage {
+ }
+ 
+ fn read_battery_overview(hwmon: &Path) -> BatteryOverview {
++    let capacity = read_i64(&hwmon.join("smc_battery_capacity_percent"))
++        .and_then(|value| u8::try_from(value.clamp(0, 100)).ok());
++    if capacity.is_some() {
++        return BatteryOverview {
++            capacity_percent: capacity,
++            current_ua: read_i64(&hwmon.join("smc_battery_current_ua")),
++            charge_now_uah: read_i64(&hwmon.join("smc_battery_charge_now_uah")),
++            charge_full_uah: read_i64(&hwmon.join("smc_battery_charge_full_uah")),
++            adapter_power_uw: read_i64(&hwmon.join("smc_adapter_power_uw")),
++        };
++    }
++
++    // Fallback for macsmc / standard Linux power_supply
++    let bat_dir = ["/sys/class/power_supply/macsmc-battery", "/sys/class/power_supply/BAT0"]
++        .into_iter()
++        .map(Path::new)
++        .find(|p| p.exists());
++    let ac_dir = ["/sys/class/power_supply/macsmc-ac", "/sys/class/power_supply/AC"]
++        .into_iter()
++        .map(Path::new)
++        .find(|p| p.exists());
++
++    let capacity_percent = bat_dir.and_then(|b| read_i64(&b.join("capacity")))
++        .and_then(|value| u8::try_from(value.clamp(0, 100)).ok());
++    let mut current_ua = bat_dir.and_then(|b| read_i64(&b.join("current_now")));
++    let status = bat_dir.and_then(|b| fs::read_to_string(b.join("status")).ok()).map(|s| s.trim().to_lowercase());
++    if let (Some(c), Some(ref s)) = (current_ua, status) {
++        if s == "discharging" && c > 0 {
++            current_ua = Some(-c);
++        }
++    }
++    let charge_now_uah = bat_dir.and_then(|b| read_i64(&b.join("charge_now")));
++    let charge_full_uah = bat_dir.and_then(|b| read_i64(&b.join("charge_full")));
++    let adapter_power_uw = ac_dir.and_then(|a| {
++        let online = read_i64(&a.join("online")).unwrap_or(0);
++        if online == 1 {
++            if let Some(p) = read_i64(&a.join("power_now")) {
++                Some(p)
++            } else {
++                let v = read_i64(&a.join("voltage_now")).unwrap_or(0);
++                let c = read_i64(&a.join("current_now")).unwrap_or(0);
++                if v > 0 && c > 0 {
++                    Some((v as i128 * c as i128 / 1_000_000) as i64)
++                } else {
++                    read_i64(&hwmon.join("power1_input"))
++                }
++            }
++        } else {
++            Some(0)
++        }
++    });
++
+     BatteryOverview {
+-        capacity_percent: read_i64(&hwmon.join("smc_battery_capacity_percent"))
+-            .and_then(|value| u8::try_from(value.clamp(0, 100)).ok()),
+-        current_ua: read_i64(&hwmon.join("smc_battery_current_ua")),
+-        charge_now_uah: read_i64(&hwmon.join("smc_battery_charge_now_uah")),
+-        charge_full_uah: read_i64(&hwmon.join("smc_battery_charge_full_uah")),
+-        adapter_power_uw: read_i64(&hwmon.join("smc_adapter_power_uw")),
++        capacity_percent,
++        current_ua,
++        charge_now_uah,
++        charge_full_uah,
++        adapter_power_uw,
+     }
+ }
+ 
+@@ -450,10 +518,11 @@ fn read_sensors(hwmon: &Path) -> Vec<(String, String, Option<i64>)> {
+     };
+     let mut sensors = Vec::new();
+     for entry in entries.flatten() {
+-        let key = fs::read_to_string(&entry)
++        let raw = fs::read_to_string(&entry)
+             .ok()
+             .map(|s| s.trim().to_string());
+-        let Some(key) = key else { continue };
++        let Some(raw) = raw else { continue };
++        let key = extract_smc_key(&raw);
+         if key.is_empty() || key.len() < 2 {
+             continue;
+         }
+@@ -472,11 +541,19 @@ fn read_sensors(hwmon: &Path) -> Vec<(String, String, Option<i64>)> {
+ }
+ 
+ fn read_charge_limit(hwmon: &Path) -> Option<u8> {
+-    fs::read_to_string(hwmon.join("battery_charge_limit"))
+-        .ok()?
+-        .trim()
+-        .parse()
+-        .ok()
++    if let Ok(limit) = fs::read_to_string(hwmon.join("battery_charge_limit")) {
++        if let Ok(val) = limit.trim().parse() {
++            return Some(val);
++        }
++    }
++    for bat in ["/sys/class/power_supply/macsmc-battery", "/sys/class/power_supply/BAT0"] {
++        if let Ok(limit) = fs::read_to_string(Path::new(bat).join("charge_control_end_threshold")) {
++            if let Ok(val) = limit.trim().parse::<u8>() {
++                return Some(if val == 0 { 100 } else { val });
++            }
++        }
++    }
++    None
+ }
+ 
+ /// One row of the Thermals list. `id` keys the row, `key` is what the key
+@@ -659,13 +736,14 @@ fn read_smc_power_stats(hwmon: &Path) -> Vec<(String, String, String)> {
+     let mut stats = Vec::new();
+ 
+     for label_path in entries.flatten() {
+-        let Some(key) = fs::read_to_string(&label_path)
++        let raw = fs::read_to_string(&label_path)
+             .ok()
+-            .map(|value| value.trim().to_string())
+-            .filter(|key| key.starts_with('P'))
+-        else {
++            .map(|value| value.trim().to_string());
++        let Some(raw) = raw else { continue };
++        let key = extract_smc_key(&raw);
++        if !key.starts_with('P') {
+             continue;
+-        };
++        }
+         let input_path = label_path.with_file_name(
+             label_path
+                 .file_name()
+@@ -691,7 +769,7 @@ fn has_smc_power_key(hwmon: &Path, wanted: &str) -> bool {
+     glob::glob(&pattern).is_ok_and(|entries| {
+         entries
+             .flatten()
+-            .any(|path| fs::read_to_string(path).is_ok_and(|key| key.trim() == wanted))
++            .any(|path| fs::read_to_string(path).is_ok_and(|raw| extract_smc_key(&raw) == wanted))
+     })
+ }
+ 
+@@ -756,6 +834,42 @@ fn read_power_telemetry(hwmon: &Path) -> Vec<(String, String, String)> {
+         |v| scaled_value(v, "W"),
+     );
+ 
++    // Fallback for macsmc / standard power_supply:
++    let bat = Path::new("/sys/class/power_supply/macsmc-battery");
++    let ac = Path::new("/sys/class/power_supply/macsmc-ac");
++    if !hwmon.join("smc_battery_voltage_uv").exists() && bat.exists() {
++        if let Some(v) = read_i64(&bat.join("voltage_now")) {
++            values.push(("Battery voltage".into(), "B0AV".into(), scaled_value(v, "V")));
++        }
++        if let Some(c) = read_i64(&bat.join("current_now")) {
++            let text = if c == 0 { "0 A".into() } else { format!("{:.3} A", c as f64 / 1_000_000.0) };
++            values.push(("Battery current".into(), "B0AC".into(), text));
++        }
++        if let Some(p) = read_i64(&bat.join("power_now")) {
++            values.push(("Battery power".into(), "B0AP".into(), scaled_value(p, "W")));
++        }
++        if let Some(c) = read_i64(&bat.join("charge_now")) {
++            values.push(("Battery charge".into(), "B0RM".into(), scaled_value(c, "Ah")));
++        }
++        if let Some(c) = read_i64(&bat.join("charge_full")) {
++            values.push(("Battery full charge".into(), "B0FC".into(), scaled_value(c, "Ah")));
++        }
++        if let Some(c) = read_i64(&bat.join("cycle_count")) {
++            values.push(("Battery cycles".into(), "B0CT".into(), c.to_string()));
++        }
++        if ac.exists() {
++            if let Some(v) = read_i64(&ac.join("voltage_now")) {
++                values.push(("Adapter voltage".into(), "VD0R".into(), scaled_value(v, "V")));
++            }
++            if let Some(c) = read_i64(&ac.join("current_now")) {
++                values.push(("Adapter current".into(), "ID0R".into(), scaled_value(c, "A")));
++            }
++            if let Some(p) = read_i64(&ac.join("power_now")) {
++                values.push(("Adapter power".into(), adapter_power_key.into(), scaled_value(p, "W")));
++            }
++        }
++    }
++
+     values.extend(read_smc_power_stats(hwmon));
+     values.sort_by(|a, b| a.1.cmp(&b.1));
+ 

@@ -61,7 +61,7 @@ src_unpack() {
 }
 
 PATCHES=(
-	"${FILESDIR}/0001-fix-branding-assets-path-and-fallback.patch"
+	"${FILESDIR}/0001-support-macsmc-and-fix-branding.patch"
 )
 
 src_prepare() {
