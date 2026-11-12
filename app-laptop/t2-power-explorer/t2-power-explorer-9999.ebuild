@@ -62,10 +62,6 @@ src_install() {
 	domenu org.t2powerexplorer.gtk.desktop
 	doicon -s scalable assets/icons/hicolor/scalable/apps/org.t2powerexplorer.gtk.svg
 
-	insinto /usr/share/kait2en
-	newins "${WORKDIR}/${P}/assets/kait2en-app-logo.png" kait2en-wordmark.png
-	newins "${WORKDIR}/${P}/assets/kait2en-app-logo-light.png" kait2en-wordmark-light.png
-
 	if [[ -f README.md ]]; then
 		dodoc README.md
 	elif [[ -f "${WORKDIR}/${P}/website/docs/post-install/applications/t2-power-explorer.md" ]]; then

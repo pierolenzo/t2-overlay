@@ -72,10 +72,6 @@ src_install() {
 	domenu org.t2zonepower.gtk.desktop
 	doicon -s scalable assets/icons/hicolor/scalable/apps/org.t2zonepower.gtk.svg
 
-	insinto /usr/share/kait2en
-	newins "${WORKDIR}/${P}/assets/kait2en-app-logo.png" kait2en-wordmark.png
-	newins "${WORKDIR}/${P}/assets/kait2en-app-logo-light.png" kait2en-wordmark-light.png
-
 	if use systemd; then
 		systemd_dounit systemd/t2-zonepowerd.service
 	fi
