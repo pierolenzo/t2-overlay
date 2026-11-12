@@ -168,8 +168,8 @@ src_install() {
 		systemd_dounit systemd/t2-smc-gaugingd.service
 	fi
 
-	keepdir /var/lib/t2-smc-control/gauging
-	fperms 0755 /var/lib/t2-smc-control/gauging
+	keepdir /var/lib/t2-smc-control
+	fperms 0755 /var/lib/t2-smc-control
 
 	dodoc README.md
 }

@@ -1,5 +1,247 @@
+diff --git a/src/gauging.rs b/src/gauging.rs
+index ca97456..3ef3ac7 100644
+--- a/src/gauging.rs
++++ b/src/gauging.rs
+@@ -19,7 +19,6 @@ use std::time::{SystemTime, UNIX_EPOCH};
+ use gtk4::glib;
+ 
+ const STATE_FILE: &str = "/var/lib/t2-smc-control/gauging";
+-const BATTERY_STATUS: &str = "/sys/class/power_supply/BAT0/status";
+ 
+ const DOD0_MAX_AGE: u64 = 3 * 86_400;
+ const FULL_CHARGE_MAX_AGE: u64 = 21 * 86_400;
+@@ -35,12 +34,24 @@ struct State {
+     dod0_changed: u64,
+     full_charge: u64,
+     attempt_started: u64,
++    user_limit: u8,
++    suspended: bool,
++}
++
++fn state_file_path() -> PathBuf {
++    let p = Path::new(STATE_FILE);
++    if p.is_dir() {
++        p.join("state")
++    } else {
++        p.to_path_buf()
++    }
+ }
+ 
+ impl State {
+     fn load() -> Self {
+         let mut state = Self::default();
+-        let Ok(text) = fs::read_to_string(STATE_FILE) else { return state };
++        let path = state_file_path();
++        let Ok(text) = fs::read_to_string(&path) else { return state };
+         for line in text.lines() {
+             let Some((key, value)) = line.split_once('=') else { continue };
+             let number = || value.parse().unwrap_or(0);
+@@ -49,6 +60,8 @@ impl State {
+                 "dod0_changed" => state.dod0_changed = number(),
+                 "full_charge" => state.full_charge = number(),
+                 "attempt_started" => state.attempt_started = number(),
++                "user_limit" => state.user_limit = value.parse().unwrap_or(0),
++                "suspended" => state.suspended = value == "true" || value == "1",
+                 _ => {}
+             }
+         }
+@@ -57,21 +70,21 @@ impl State {
+ 
+     fn save(&self) {
+         let text = format!(
+-            "dod0={}\ndod0_changed={}\nfull_charge={}\nattempt_started={}\n",
+-            self.dod0, self.dod0_changed, self.full_charge, self.attempt_started
++            "dod0={}\ndod0_changed={}\nfull_charge={}\nattempt_started={}\nuser_limit={}\nsuspended={}\n",
++            self.dod0, self.dod0_changed, self.full_charge, self.attempt_started, self.user_limit, self.suspended
+         );
+-        let path = Path::new(STATE_FILE);
++        let path = state_file_path();
+         if let Some(dir) = path.parent() {
+             let _ = fs::create_dir_all(dir);
+         }
+-        if let Err(err) = fs::write(path, text) {
+-            eprintln!("cannot write {STATE_FILE}: {err}");
++        if let Err(err) = fs::write(&path, text) {
++            eprintln!("cannot write {}: {err}", path.display());
+         }
+     }
+ 
+     /// disableSocLimitPolicy: true while a full charge is needed
+     fn update(&mut self, now: u64, dod0: &str, fully_charged: bool) -> bool {
+-        if self.dod0 != dod0 {
++        if !dod0.is_empty() && self.dod0 != dod0 {
+             self.dod0 = dod0.to_owned();
+             self.dod0_changed = now;
+         }
+@@ -80,7 +93,7 @@ impl State {
+             self.attempt_started = 0;
+         }
+ 
+-        let mut charge = now - self.dod0_changed >= DOD0_MAX_AGE;
++        let mut charge = !self.dod0.is_empty() && now - self.dod0_changed >= DOD0_MAX_AGE;
+         if now - self.full_charge > FULL_CHARGE_MAX_AGE {
+             if self.attempt_started == 0 {
+                 self.attempt_started = now;
+@@ -102,37 +115,97 @@ fn read_trimmed(path: &Path) -> Option<String> {
+     fs::read_to_string(path).ok().map(|text| text.trim().to_owned())
+ }
+ 
+-fn set_suspended(hwmon: &Path, suspended: bool) {
+-    let path = hwmon.join("battery_charge_limit_suspended");
+-    let value = if suspended { "1" } else { "0" };
+-    if read_trimmed(&path).as_deref() == Some(value) {
++fn find_charge_control_threshold_path() -> Option<PathBuf> {
++    for path in [
++        "/sys/class/power_supply/macsmc-battery/charge_control_end_threshold",
++        "/sys/class/power_supply/BAT0/charge_control_end_threshold",
++    ] {
++        let p = PathBuf::from(path);
++        if p.exists() {
++            return Some(p);
++        }
++    }
++    None
++}
++
++fn set_suspended(hwmon: &Path, state: &mut State, suspended: bool) {
++    if hwmon.join("battery_charge_limit_suspended").exists() {
++        let path = hwmon.join("battery_charge_limit_suspended");
++        let value = if suspended { "1" } else { "0" };
++        if read_trimmed(&path).as_deref() == Some(value) {
++            return;
++        }
++        match fs::write(&path, value) {
++            Ok(()) => println!("charge limit {}", if suspended { "lifted for a calibration charge" } else { "restored" }),
++            Err(err) => eprintln!("cannot write {}: {err}", path.display()),
++        }
+         return;
+     }
+-    match fs::write(&path, value) {
+-        Ok(()) => println!("charge limit {}", if suspended { "lifted for a calibration charge" } else { "restored" }),
+-        Err(err) => eprintln!("cannot write {}: {err}", path.display()),
++
++    // macsmc / standard Linux power_supply
++    let Some(threshold_path) = find_charge_control_threshold_path() else { return; };
++    let current_threshold: u8 = read_trimmed(&threshold_path)
++        .and_then(|s| s.parse().ok())
++        .unwrap_or(0);
++
++    if suspended {
++        if !state.suspended {
++            // User had an active limit (< 100 and > 0)
++            if current_threshold > 0 && current_threshold < 100 {
++                state.user_limit = current_threshold;
++                state.suspended = true;
++                if let Err(e) = fs::write(&threshold_path, "100") {
++                    eprintln!("cannot lift charge limit on {}: {e}", threshold_path.display());
++                } else {
++                    println!("charge limit ({}%) lifted for a calibration charge", state.user_limit);
++                }
++            }
++        }
++    } else if state.suspended {
++        let restore_to = if state.user_limit > 0 && state.user_limit < 100 { state.user_limit } else { 80 };
++        state.suspended = false;
++        if let Err(e) = fs::write(&threshold_path, restore_to.to_string()) {
++            eprintln!("cannot restore charge limit on {}: {e}", threshold_path.display());
++        } else {
++            println!("charge limit restored to {}%", restore_to);
++        }
+     }
+ }
+ 
+ fn tick(hwmon: &Path, state: &mut State) {
+-    let Some(dod0) = read_trimmed(&hwmon.join("smc_battery_dod0")) else { return };
+-    // sbs reports Full while the limit holds, t2sbs only when the gauge flags
+-    // it, so the SMC SoC decides
+-    let fully_charged = matches!(read_trimmed(Path::new(BATTERY_STATUS)).as_deref(), Some("Full" | "Not charging"))
+-        && read_trimmed(&hwmon.join("smc_battery_capacity_percent"))
+-            .and_then(|soc| soc.parse::<u32>().ok())
+-            .is_some_and(|soc| soc >= 99);
++    let dod0 = read_trimmed(&hwmon.join("smc_battery_dod0")).unwrap_or_default();
++
++    let battery_status = [
++        "/sys/class/power_supply/macsmc-battery/status",
++        "/sys/class/power_supply/BAT0/status",
++    ]
++    .into_iter()
++    .map(Path::new)
++    .find(|p| p.exists())
++    .and_then(read_trimmed);
++
++    let soc = read_trimmed(&hwmon.join("smc_battery_capacity_percent"))
++        .or_else(|| read_trimmed(Path::new("/sys/class/power_supply/macsmc-battery/capacity")))
++        .or_else(|| read_trimmed(Path::new("/sys/class/power_supply/BAT0/capacity")))
++        .and_then(|soc| soc.parse::<u32>().ok());
++
++    let fully_charged = matches!(battery_status.as_deref(), Some("Full" | "Not charging"))
++        && soc.is_some_and(|s| s >= 99);
++
+     let before = format!("{state:?}");
+     let charge = state.update(now(), &dod0, fully_charged);
+     if format!("{state:?}") != before {
+         state.save();
+     }
+-    set_suspended(hwmon, charge);
++    set_suspended(hwmon, state, charge);
+ }
+ 
+ pub fn run(hwmon: PathBuf) -> Result<(), String> {
+-    if !hwmon.join("battery_charge_limit_suspended").exists() {
+-        return Err("t2smc has no battery_charge_limit_suspended, nothing to do".into());
++    let has_t2smc_suspended = hwmon.join("battery_charge_limit_suspended").exists();
++    let has_macsmc_threshold = find_charge_control_threshold_path().is_some();
++
++    if !has_t2smc_suspended && !has_macsmc_threshold {
++        return Err("neither battery_charge_limit_suspended nor charge_control_end_threshold found".into());
+     }
+ 
+     let state = Rc::new(RefCell::new(State::load()));
+@@ -155,8 +228,10 @@ pub fn run(hwmon: PathBuf) -> Result<(), String> {
+     }
+     main_loop.run();
+ 
+-    // The SMC keeps CHLS over reboots, leave it with the user limit
+-    set_suspended(&hwmon, false);
++    // Leave it with the user limit when exiting
++    let mut s = state.borrow_mut();
++    set_suspended(&hwmon, &mut s, false);
++    s.save();
+     Ok(())
+ }
+ 
+@@ -172,6 +247,7 @@ mod tests {
+             dod0_changed: now,
+             full_charge: now,
+             attempt_started: 0,
++            ..Default::default()
+         }
+     }
+ 
+@@ -197,4 +273,21 @@ mod tests {
+         assert!(state.update(now + 6 * 3_600, "8100", false));
+         assert!(!state.update(now + 13 * 3_600, "8101", false));
+     }
++
++    #[test]
++    fn old_full_charge_without_dod0_triggers_calibration_on_day_22() {
++        let mut state = State {
++            full_charge: 1_000_000,
++            ..Default::default()
++        };
++        // Day 20: not yet
++        assert!(!state.update(1_000_000 + 20 * DAY, "", false));
++        // Day 21: not yet
++        assert!(!state.update(1_000_000 + 21 * DAY, "", false));
++        // Day 22: triggers calibration charge!
++        assert!(state.update(1_000_000 + 22 * DAY, "", false));
++        // When fully charged, charge returns to false and full_charge resets
++        assert!(!state.update(1_000_000 + 22 * DAY + 100, "", true));
++        assert_eq!(state.full_charge, 1_000_000 + 22 * DAY + 100);
++    }
+ }
 diff --git a/src/main.rs b/src/main.rs
-index 4845a75..67c7dc7 100644
+index 4845a75..c06acab 100644
 --- a/src/main.rs
 +++ b/src/main.rs
 @@ -17,19 +17,35 @@ use gtk4::{gio, glib};
@@ -237,3 +479,26 @@ index 4845a75..67c7dc7 100644
      values.extend(read_smc_power_stats(hwmon));
      values.sort_by(|a, b| a.1.cmp(&b.1));
  
+@@ -790,7 +904,21 @@ fn set_status(label: &gtk4::Label, text: &str, error: bool) {
+ 
+ /// t2-smc-gaugingd lifts the limit for a calibration charge
+ fn charge_limit_suspended(hwmon: &Path) -> bool {
+-    fs::read_to_string(hwmon.join("battery_charge_limit_suspended")).is_ok_and(|value| value.trim() == "1")
++    if fs::read_to_string(hwmon.join("battery_charge_limit_suspended")).is_ok_and(|value| value.trim() == "1") {
++        return true;
++    }
++    for file in ["/var/lib/t2-smc-control/gauging", "/var/lib/t2-smc-control/gauging/state"] {
++        if let Ok(text) = fs::read_to_string(file) {
++            for line in text.lines() {
++                if let Some((k, v)) = line.split_once('=') {
++                    if k == "suspended" && (v == "true" || v == "1") {
++                        return true;
++                    }
++                }
++            }
++        }
++    }
++    false
+ }
+ 
+ const CHARGE_LIMIT_TOOLTIP: &str = "Set in the desktop environment's power settings";
