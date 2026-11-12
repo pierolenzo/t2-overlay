@@ -1,0 +1,96 @@
+diff -uprN a/org.t2zonepower.gtk.desktop b/org.t2zonepower.gtk.desktop
+--- a/org.t2zonepower.gtk.desktop	2026-10-15 19:01:13.253704397 +0200
++++ b/org.t2zonepower.gtk.desktop	2026-11-12 17:05:28.900069759 +0100
+@@ -3,7 +3,7 @@ Type=Application
+ Version=1.0
+ Name=T2 Zone Power
+ Comment=Watch the SMC power zones of T2 Macs on Linux
+-Exec=/usr/local/bin/t2-zonepower-gtk
++Exec=/usr/bin/t2-zonepower-gtk
+ Icon=org.t2zonepower.gtk
+ Terminal=false
+ Categories=System;Monitor;HardwareSettings;
+diff -uprN a/src/gui.rs b/src/gui.rs
+--- a/src/gui.rs	2026-11-11 03:30:45.252633854 +0100
++++ b/src/gui.rs	2026-11-12 17:05:28.899665144 +0100
+@@ -18,14 +18,17 @@ const APP_VERSION: &str = "0.03";
+ const HISTORY_CAPACITY: usize = 90;
+ 
+ fn kait2en_brand() -> DrawingArea {
+-    // White type for dark surfaces, dark type for light ones. Without the
+-    // light file the white one is used.
+-    let dark = gtk4::gdk_pixbuf::Pixbuf::from_file("/usr/local/share/kait2en/kait2en-wordmark.png")
+-        .expect("failed to load kait2en wordmark");
+-    let light = gtk4::gdk_pixbuf::Pixbuf::from_file("/usr/local/share/kait2en/kait2en-wordmark-light.png")
+-        .unwrap_or_else(|_| dark.clone());
+     let brand = DrawingArea::new();
+     brand.set_content_width(80); brand.set_content_height(21); brand.set_size_request(80, 21);
++
++    let dark = gtk4::gdk_pixbuf::Pixbuf::from_file("/usr/share/kait2en/kait2en-wordmark.png")
++        .or_else(|_| gtk4::gdk_pixbuf::Pixbuf::from_file("/usr/local/share/kait2en/kait2en-wordmark.png"))
++        .ok();
++    let Some(dark) = dark else { return brand; };
++    let light = gtk4::gdk_pixbuf::Pixbuf::from_file("/usr/share/kait2en/kait2en-wordmark-light.png")
++        .or_else(|_| gtk4::gdk_pixbuf::Pixbuf::from_file("/usr/local/share/kait2en/kait2en-wordmark-light.png"))
++        .unwrap_or_else(|_| dark.clone());
++
+     brand.set_draw_func(move |_area, context, width, height| {
+         let pixbuf = if adw::StyleManager::default().is_dark() { &dark } else { &light };
+         let scale = f64::min(width as f64 / pixbuf.width() as f64, height as f64 / pixbuf.height() as f64);
+diff -uprN a/src/plimit.rs b/src/plimit.rs
+--- a/src/plimit.rs	2026-11-11 03:30:45.252633854 +0100
++++ b/src/plimit.rs	2026-11-12 17:05:28.899931951 +0100
+@@ -34,6 +34,9 @@ impl PLimits {
+     /// Parses `smc_plimit_raw`, for example `2e001627 0f`
+     pub fn read(t2smc: &Path) -> Result<Self> {
+         let path = t2smc.join("smc_plimit_raw");
++        if !path.exists() {
++            return Ok(Self::default());
++        }
+         let raw = read_string(&path)?;
+         let parse_error = || ZonePowerError::Parse { path: path.clone(), value: raw.clone() };
+         let (word, gpu) = raw.split_once(' ').ok_or_else(parse_error)?;
+diff -uprN a/src/sensors.rs b/src/sensors.rs
+--- a/src/sensors.rs	2026-10-15 19:01:13.253932506 +0200
++++ b/src/sensors.rs	2026-11-12 17:05:28.899858987 +0100
+@@ -25,7 +25,16 @@ impl SmcSensors {
+         for label in glob_paths(&format!("{}/*_label", t2smc.display())).unwrap_or_default() {
+             let (Ok(key), Some(name)) = (read_string(&label), label.file_name()) else { continue };
+             let input = name.to_string_lossy().replace("_label", "_input");
+-            inputs.insert(key, t2smc.join(input));
++            let raw_key = key.clone();
++            if let Some(start) = raw_key.rfind('(') {
++                if let Some(end) = raw_key.rfind(')') {
++                    if start < end {
++                        let extracted = raw_key[start + 1..end].trim();
++                        inputs.insert(extracted.to_string(), t2smc.join(&input));
++                    }
++                }
++            }
++            inputs.insert(raw_key, t2smc.join(input));
+         }
+         Self { t2smc: t2smc.to_owned(), inputs, dgpu: OnceCell::new() }
+     }
+diff -uprN a/src/sysfs.rs b/src/sysfs.rs
+--- a/src/sysfs.rs	2026-10-15 19:01:13.253932506 +0200
++++ b/src/sysfs.rs	2026-11-12 17:05:28.899767641 +0100
+@@ -32,6 +32,6 @@ pub fn glob_paths(pattern: &str) -> Resu
+ pub fn find_t2smc() -> Result<PathBuf> {
+     glob_paths("/sys/class/hwmon/hwmon*")?
+         .into_iter()
+-        .find(|dir| read_string(&dir.join("name")).is_ok_and(|name| name == "t2smc"))
++        .find(|dir| read_string(&dir.join("name")).is_ok_and(|name| name == "t2smc" || name == "macsmc_hwmon" || name == "macsmc"))
+         .ok_or(ZonePowerError::NoSmc)
+ }
+diff -uprN a/systemd/t2-zonepowerd.service b/systemd/t2-zonepowerd.service
+--- a/systemd/t2-zonepowerd.service	2026-10-15 19:01:13.253932506 +0200
++++ b/systemd/t2-zonepowerd.service	2026-11-12 17:05:28.900000720 +0100
+@@ -6,7 +6,7 @@ After=multi-user.target
+ Type=simple
+ User=root
+ Group=root
+-ExecStart=/usr/local/bin/t2-zonepower-gtk --daemon
++ExecStart=/usr/bin/t2-zonepower-gtk --daemon
+ Restart=always
+ RestartSec=2
+ 
