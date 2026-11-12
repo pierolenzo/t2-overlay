@@ -66,7 +66,12 @@ src_install() {
 	newins "${WORKDIR}/${P}/assets/kait2en-app-logo.png" kait2en-wordmark.png
 	newins "${WORKDIR}/${P}/assets/kait2en-app-logo-light.png" kait2en-wordmark-light.png
 
-	dodoc README.md
+	if [[ -f README.md ]]; then
+		dodoc README.md
+	elif [[ -f "${WORKDIR}/${P}/website/docs/post-install/applications/t2-power-explorer.md" ]]; then
+		newdoc "${WORKDIR}/${P}/website/docs/post-install/applications/t2-power-explorer.md" README.md
+	fi
+	dodoc LICENSE
 }
 
 pkg_postinst() {

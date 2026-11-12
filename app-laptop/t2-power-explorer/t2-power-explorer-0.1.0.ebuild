@@ -143,7 +143,12 @@ src_install() {
 	newins "${WORKDIR}/KaiT2en-Fedora-${COMMIT}/assets/kait2en-app-logo.png" kait2en-wordmark.png
 	newins "${WORKDIR}/KaiT2en-Fedora-${COMMIT}/assets/kait2en-app-logo-light.png" kait2en-wordmark-light.png
 
-	dodoc README.md
+	if [[ -f README.md ]]; then
+		dodoc README.md
+	elif [[ -f "${WORKDIR}/KaiT2en-Fedora-${COMMIT}/website/docs/post-install/applications/t2-power-explorer.md" ]]; then
+		newdoc "${WORKDIR}/KaiT2en-Fedora-${COMMIT}/website/docs/post-install/applications/t2-power-explorer.md" README.md
+	fi
+	dodoc LICENSE
 }
 
 pkg_postinst() {
