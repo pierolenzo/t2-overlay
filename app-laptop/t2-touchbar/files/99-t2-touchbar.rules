@@ -7,7 +7,9 @@ SUBSYSTEM=="drm", KERNEL=="card*", DRIVERS=="t2bdrm|appletbdrm|adp", TAG-="maste
 
 # Digitizer multitouch (presente solo in configurazione 2 con DRM)
 SUBSYSTEM=="input", ATTR{name}=="Apple Inc. Touch Bar Display Touchpad", ENV{SYSTEMD_WANTS}="", ENV{ID_SEAT}="seat-touchbar", GROUP="input", MODE="0660"
+SUBSYSTEM=="input", ATTR{name}=="Apple Inc. Touch Bar Display", ENV{SYSTEMD_WANTS}="", ENV{ID_SEAT}="seat-touchbar", GROUP="input", MODE="0660"
 SUBSYSTEM=="input", KERNEL=="event*", ATTRS{name}=="Apple Inc. Touch Bar Display Touchpad", ENV{ID_SEAT}="seat-touchbar", GROUP="input", MODE="0660"
+SUBSYSTEM=="input", KERNEL=="event*", ATTRS{name}=="Apple Inc. Touch Bar Display", ENV{ID_SEAT}="seat-touchbar", GROUP="input", MODE="0660"
 
 # Touch Bar Apple Silicon (ADP)
 SUBSYSTEM=="input", ATTR{name}=="MacBookPro17,1 Touch Bar", ENV{SYSTEMD_WANTS}="", ENV{ID_SEAT}="seat-touchbar", GROUP="input", MODE="0660"
@@ -45,4 +47,4 @@ ACTION=="add|change", SUBSYSTEM=="backlight", KERNEL=="appletb_backlight", RUN+=
 SUBSYSTEM=="misc", KERNEL=="uinput", GROUP="input", MODE="0660"
 
 # Trackpad haptic actuator feedback
-ACTION=="add", SUBSYSTEM=="hid", DRIVERS=="t2_trackpad_actuator", RUN+="/bin/chgrp input /sys/module/t2_trackpad_actuator/parameters/play", RUN+="/bin/chmod g+w /sys/module/t2_trackpad_actuator/parameters/play"
+ACTION=="add|change", SUBSYSTEM=="hid", DRIVERS=="t2_trackpad_actuator", RUN+="/bin/chgrp input /sys/module/t2_trackpad_actuator/parameters/play", RUN+="/bin/chmod g+w /sys/module/t2_trackpad_actuator/parameters/play"

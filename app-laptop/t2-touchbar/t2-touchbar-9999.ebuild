@@ -5,13 +5,13 @@ EAPI=8
 
 inherit cargo git-r3 linux-info systemd udev
 
-DESCRIPTION="Dark-first Touch Bar daemon for Apple T2 MacBooks (live git)"
+DESCRIPTION="Dark-first Touch Bar daemon for Apple T2 MacBooks (live git master)"
 HOMEPAGE="https://github.com/kaiT2en/KaiT2en-Fedora"
 EGIT_REPO_URI="https://github.com/kaiT2en/KaiT2en-Fedora.git"
 
 S="${WORKDIR}/${P}/apps/t2-touchbar"
 
-LICENSE="GPL-3+ MIT Apache-2.0 BSD Unicode-3.0"
+LICENSE="GPL-3+ Apache-2.0 BSD CC0-1.0 ISC MIT MPL-2.0 Unicode-3.0 Unicode-DFS-2016 Zlib"
 SLOT="0"
 KEYWORDS=""
 IUSE="elogind systemd"
@@ -54,7 +54,9 @@ pkg_setup() {
 
 src_unpack() {
 	git-r3_src_unpack
+	pushd "${S}" >/dev/null || die
 	cargo_live_src_unpack
+	popd >/dev/null || die
 }
 
 PATCHES=(

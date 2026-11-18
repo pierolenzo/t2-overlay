@@ -11,11 +11,11 @@ CRATES="
 	arrayvec@0.7.8
 	async-broadcast@0.7.2
 	async-channel@2.5.0
-	async-executor@1.14.0
+	async-executor@1.14.1
 	async-io@2.6.0
-	async-lock@3.4.2
+	async-lock@3.5.0
 	async-process@2.5.0
-	async-recursion@1.1.1
+	async-recursion@1.2.0
 	async-signal@0.2.14
 	async-task@4.7.1
 	async-trait@0.1.92
@@ -37,7 +37,7 @@ CRATES="
 	endi@1.1.1
 	enumflags2@0.7.12
 	enumflags2_derive@0.7.12
-	equivalent@1.0.2
+	equivalent@1.0.3
 	errno@0.3.14
 	event-listener-strategy@0.5.4
 	event-listener@5.4.2
@@ -58,13 +58,13 @@ CRATES="
 	input-sys@1.19.0
 	input@0.9.1
 	io-lifetimes@1.0.11
-	js-sys@0.3.104
-	libc@0.2.189
+	js-sys@0.3.107
+	libc@0.2.191
 	libudev-sys@0.1.4
 	linux-raw-sys@0.12.1
 	linux-raw-sys@0.4.15
 	linux-raw-sys@0.9.4
-	log@0.4.34
+	log@0.4.35
 	memchr@2.8.3
 	memoffset@0.9.1
 	nix@0.29.0
@@ -81,7 +81,7 @@ CRATES="
 	quote@1.0.47
 	r-efi@6.0.0
 	rustix@0.38.44
-	rustix@1.1.5
+	rustix@1.1.6
 	rustversion@1.0.23
 	serde@1.0.229
 	serde_core@1.0.229
@@ -92,16 +92,16 @@ CRATES="
 	slab@0.4.12
 	strict-num@0.1.1
 	syn@2.0.119
-	syn@3.0.6
+	syn@3.0.10
 	tempfile@3.27.0
 	tiny-skia-path@0.12.0
 	tiny-skia@0.12.0
 	toml@0.8.23
 	toml_datetime@0.6.11
-	toml_datetime@1.1.1+spec-1.1.0
+	toml_datetime@1.1.3+spec-1.1.0
 	toml_edit@0.22.27
-	toml_edit@0.25.15+spec-1.1.0
-	toml_parser@1.1.3+spec-1.1.0
+	toml_edit@0.25.19+spec-1.1.0
+	toml_parser@1.1.5+spec-1.1.0
 	toml_write@0.1.2
 	tracing-attributes@0.1.31
 	tracing-core@0.1.36
@@ -109,12 +109,12 @@ CRATES="
 	ttf-parser@0.25.1
 	udev@0.9.3
 	uds_windows@1.2.1
-	unicode-ident@1.0.26
-	uuid@1.26.1
-	wasm-bindgen-macro-support@0.2.127
-	wasm-bindgen-macro@0.2.127
-	wasm-bindgen-shared@0.2.127
-	wasm-bindgen@0.2.127
+	unicode-ident@1.0.27
+	uuid@1.29.2
+	wasm-bindgen-macro-support@0.2.130
+	wasm-bindgen-macro@0.2.130
+	wasm-bindgen-shared@0.2.130
+	wasm-bindgen@0.2.130
 	windows-link@0.2.1
 	windows-sys@0.48.0
 	windows-sys@0.59.0
@@ -137,13 +137,13 @@ CRATES="
 	windows_x86_64_msvc@0.48.5
 	windows_x86_64_msvc@0.52.6
 	winnow@0.7.15
-	winnow@1.0.4
+	winnow@1.0.5
 	zbus@5.19.0
 	zbus_macros@5.19.0
-	zbus_names@4.3.4
-	zcheapstr@1.1.0
-	zvariant@5.15.0
-	zvariant_derive@5.15.0
+	zbus_names@4.3.5
+	zcheapstr@1.2.0
+	zvariant@5.15.1
+	zvariant_derive@5.15.1
 	zvariant_utils@4.2.0
 "
 
@@ -151,17 +151,17 @@ inherit cargo linux-info systemd udev
 
 DESCRIPTION="Dark-first Touch Bar daemon for Apple T2 MacBooks"
 HOMEPAGE="https://github.com/kaiT2en/KaiT2en-Fedora"
-
-# Snapshot commit from kaiT2en-Fedora repository containing t2-touchbar
-COMMIT="9b640bed73afd13b09a1552ea625920873ba2b80"
+COMMIT="b0acfa7c0abe203d45152d61e190165278b39c1e"
 SRC_URI="
-	https://github.com/kaiT2en/KaiT2en-Fedora/archive/${COMMIT}.tar.gz -> ${P}.tar.gz
+	https://github.com/kaiT2en/KaiT2en-Fedora/archive/${COMMIT}.tar.gz -> ${P}-${COMMIT:0:7}.tar.gz
 	${CARGO_CRATE_URIS}
 "
 
 S="${WORKDIR}/KaiT2en-Fedora-${COMMIT}/apps/t2-touchbar"
 
-LICENSE="GPL-3+ MIT Apache-2.0 BSD Unicode-3.0"
+LICENSE="GPL-3+"
+# Dependent crate licenses
+LICENSE+=" Apache-2.0 BSD CC0-1.0 ISC MIT MPL-2.0 Unicode-3.0 Unicode-DFS-2016 Zlib"
 SLOT="0"
 KEYWORDS="~amd64"
 IUSE="elogind systemd"
@@ -211,7 +211,7 @@ src_prepare() {
 
 	# Add Gentoo font paths to FONT_PATHS in renderer.rs
 	sed -i 's|"/usr/share/fonts/adwaita-sans-fonts/AdwaitaSans-Regular.ttf",|"/usr/share/fonts/Adwaita/AdwaitaSans-Regular.ttf",\n    "/usr/share/fonts/inter/InterVariable.ttf",\n    "/usr/share/fonts/cantarell/Cantarell-VF.otf",\n    "/usr/share/fonts/adwaita-sans-fonts/AdwaitaSans-Regular.ttf",|' src/renderer.rs || die
-	sed -i 's|const FONT_PATHS: \[&str; 3\] = \[|const FONT_PATHS: [\&str; 6] = [|' src/renderer.rs || die
+	sed -i 's|const FONT_PATHS: \[\&str; 3\] = \||const FONT_PATHS: [\&str; 6] = [|' src/renderer.rs || die
 
 	# Adjust systemd service paths from /usr/local/bin to /usr/bin
 	sed -i 's|/usr/local/bin|/usr/bin|g' \
