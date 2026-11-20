@@ -284,7 +284,7 @@ def transform_ebuild(content, sha):
     )
     content = replace_once(
         content,
-        r"(\n[ \t]*verify-sig\? \(\n[ \t]*https://cdn\.kernel\.org/pub/linux/kernel/)",
+        r"(\n[ \t]*verify-sig\? \(\n[ \t]*https://(?:cdn\.)?kernel\.org/pub/linux/kernel/)",
         replacement,
         "t2linux patch SRC_URI",
     )

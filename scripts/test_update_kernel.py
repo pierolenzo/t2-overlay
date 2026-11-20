@@ -167,6 +167,17 @@ class TransformTests(unittest.TestCase):
             new_gen,
         )
 
+    def test_transform_ebuild_supports_cdn_and_direct_kernel_org_urls(self):
+        gen_cdn = update_kernel.transform_ebuild(UPSTREAM_EBUILD, VALID_SHA)
+        self.assertIn("linux-t2-patches-${LINUX_T2_PATCHES_VER}.tar.gz", gen_cdn)
+
+        direct_upstream = UPSTREAM_EBUILD.replace(
+            "https://cdn.kernel.org/pub/linux/kernel/v$(ver_cut 1).x/sha256sums.asc",
+            "https://kernel.org/pub/linux/kernel/v$(ver_cut 1).x/sha256sums.asc",
+        )
+        gen_direct = update_kernel.transform_ebuild(direct_upstream, VALID_SHA)
+        self.assertIn("linux-t2-patches-${LINUX_T2_PATCHES_VER}.tar.gz", gen_direct)
+
     def test_transform_ebuild_fails_when_upstream_shape_changes(self):
         broken = UPSTREAM_EBUILD.replace('\teapply "${WORKDIR}/${PATCHSET}"\n', "")
         with self.assertRaises(update_kernel.UpdateError):
