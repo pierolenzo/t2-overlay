@@ -167,6 +167,26 @@ class TransformTests(unittest.TestCase):
             new_gen,
         )
 
+    def test_transform_ebuild_inserts_patch_when_verify_sig_layout_changes(self):
+        upstream = UPSTREAM_EBUILD.replace(
+            '\tverify-sig? (\n'
+            '\t\thttps://cdn.kernel.org/pub/linux/kernel/v$(ver_cut 1).x/sha256sums.asc\n'
+            '\t)\n',
+            '\thttps://cdn.kernel.org/pub/linux/kernel/v$(ver_cut 1).x/patch-${PATCH_PV}.xz\n',
+        )
+
+        generated = update_kernel.transform_ebuild(upstream, VALID_SHA)
+
+        self.assertIn(
+            "https://github.com/pierolenzo/linux-t2-patches/archive/"
+            "${LINUX_T2_PATCHES_VER}.tar.gz",
+            generated,
+        )
+        self.assertIn(
+            "-> linux-t2-patches-${LINUX_T2_PATCHES_VER}.tar.gz",
+            generated,
+        )
+
     def test_transform_ebuild_fails_when_upstream_shape_changes(self):
         broken = UPSTREAM_EBUILD.replace('\teapply "${WORKDIR}/${PATCHSET}"\n', "")
         with self.assertRaises(update_kernel.UpdateError):

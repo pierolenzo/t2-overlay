@@ -278,13 +278,14 @@ def transform_ebuild(content, sha):
     )
 
     replacement = (
-        "\n\t"
+        'SRC_URI+="\n'
+        "\t"
         "https://github.com/pierolenzo/linux-t2-patches/archive/${LINUX_T2_PATCHES_VER}.tar.gz"
-        "\n\t\t\t-> linux-t2-patches-${LINUX_T2_PATCHES_VER}.tar.gz\\1"
+        "\n\t\t\t-> linux-t2-patches-${LINUX_T2_PATCHES_VER}.tar.gz\n"
     )
     content = replace_once(
         content,
-        r"(\n[ \t]*verify-sig\? \(\n[ \t]*https://cdn\.kernel\.org/pub/linux/kernel/)",
+        r'SRC_URI\+="\n',
         replacement,
         "t2linux patch SRC_URI",
     )
